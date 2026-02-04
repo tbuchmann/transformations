@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dag:Model xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:dag="http://de.ubt.ai1.bw.qvt.examples.dag.ecore" xsi:schemaLocation="http://de.ubt.ai1.bw.qvt.examples.dag.ecore ExpressionDAG.ecore">
+  <exprs xsi:type="dag:Operator" left="//@exprs.1" right="//@exprs.1" op="Multiply"/>
+  <exprs xsi:type="dag:Operator" leftInverse="//@exprs.0" rightInverse="//@exprs.0" left="//@exprs.2" right="//@exprs.5"/>
+  <exprs xsi:type="dag:Operator" leftInverse="//@exprs.1" left="//@exprs.3" right="//@exprs.4" op="Divide"/>
+  <exprs xsi:type="dag:Variable" leftInverse="//@exprs.2" name="a"/>
+  <exprs xsi:type="dag:Number" rightInverse="//@exprs.2 //@exprs.5" value="10"/>
+  <exprs xsi:type="dag:Operator" rightInverse="//@exprs.1" left="//@exprs.6" right="//@exprs.4" op="Subtract"/>
+  <exprs xsi:type="dag:Variable" leftInverse="//@exprs.5" name="b"/>
+</dag:Model>

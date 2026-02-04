@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gantt:GanttDiagram xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:gantt="http://de.ubt.ai1.bw.qvt.examples.gantt.ecore" name="Example">
+  <elements xsi:type="gantt:Activity" name="A1" duration="2" outgoingDependencies="//@elements.4"/>
+  <elements xsi:type="gantt:Activity" name="A2" duration="3" outgoingDependencies="//@elements.3" incomingDependencies="//@elements.4"/>
+  <elements xsi:type="gantt:Activity" name="A3" duration="4" incomingDependencies="//@elements.3"/>
+  <elements xsi:type="gantt:Dependency" predecessor="//@elements.1" successor="//@elements.2" offset="2"/>
+  <elements xsi:type="gantt:Dependency" predecessor="//@elements.0" successor="//@elements.1" dependencyType="EndEnd"/>
+</gantt:GanttDiagram>

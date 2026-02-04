@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnw:Net xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:pnw="http://de.ubt.ai1.bw.qvt.examples.pnw.ecore" xsi:schemaLocation="http://de.ubt.ai1.bw.qvt.examples.pnw.ecore PetriNetWeighted.ecore" name="Example">
+  <elements xsi:type="pnw:Transition" name="T1" outTPEdges="//@elements.8 //@elements.11" inPTEdges="//@elements.3 //@elements.5"/>
+  <elements xsi:type="pnw:Transition" name="T2" outTPEdges="//@elements.9" inPTEdges="//@elements.6"/>
+  <elements xsi:type="pnw:Place" name="P1" outPTEdges="//@elements.3"/>
+  <elements xsi:type="pnw:PTEdge" fromPlace="P1" toTransition="T1"/>
+  <elements xsi:type="pnw:Place" name="P2" outPTEdges="//@elements.5 //@elements.6"/>
+  <elements xsi:type="pnw:PTEdge" fromPlace="P2" toTransition="T1"/>
+  <elements xsi:type="pnw:PTEdge" fromPlace="P2" toTransition="T2"/>
+  <elements xsi:type="pnw:Place" name="P3" inTPEdges="//@elements.8 //@elements.9"/>
+  <elements xsi:type="pnw:TPEdge" fromTransition="T1" toPlace="P3"/>
+  <elements xsi:type="pnw:TPEdge" fromTransition="T2" toPlace="P3"/>
+  <elements xsi:type="pnw:Place" name="P4" inTPEdges="//@elements.11"/>
+  <elements xsi:type="pnw:TPEdge" fromTransition="T1" toPlace="P4"/>
+</pnw:Net>

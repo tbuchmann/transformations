@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: ecore2sql
+Bundle-SymbolicName: ecore2sql; singleton:=true
+Bundle-Version: 0.1.0.qualifier
+Import-Package: org.eclipse.emf.ecore
+Require-Bundle: org.eclipse.emf.ecore

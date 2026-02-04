@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="test"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/bags12bags2"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/bags22bags1"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/oset2set"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/pdb12pdb2"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/pdb22pdb1"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/pn2pnw"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/pnw2pn"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/set2oset"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/cpm2gantt"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/gantt2cpm"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ast2dag"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/dag2ast"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ecore2sql"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/sql2ecore"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

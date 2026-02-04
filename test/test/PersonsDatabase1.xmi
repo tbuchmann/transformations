@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pdb1:Database xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:pdb1="http://de.ubt.ai1.bw.qvt.examples.pdb1.ecore" xsi:schemaLocation="http://de.ubt.ai1.bw.qvt.examples.pdb1.ecore PersonsDB1.ecore" name="Example">
+  <persons firstName="John" lastName="Smith" birthday="1990" placeOfBirth="Bornemouth" id="135"/>
+  <persons firstName="Mary" lastName="Parker" birthday="1989/02/03" placeOfBirth="Liverpool" id="123"/>
+  <persons firstName="Timothy" lastName="Walker" birthday="1978" placeOfBirth="Paignton" id="102"/>
+</pdb1:Database>

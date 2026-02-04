@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sql:Schema xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sql="http://de.ubt.ai1.bw.qvt.examples.sql.ecore" xsi:schemaLocation="http://de.ubt.ai1.bw.qvt.examples.sql.ecore SQL.ecore" name="cm">
+  <ownedAnnotations annotation="package"/>
+  <ownedTables name="EObject" referencingForeignKeys="//@ownedTables.3/@ownedForeignKeys.0 //@ownedTables.6/@ownedForeignKeys.0 //@ownedTables.7/@ownedForeignKeys.0 //@ownedTables.8/@ownedForeignKeys.0 //@ownedTables.9/@ownedForeignKeys.0">
+    <ownedColumns name="id" type="int" keys="//@ownedTables.0/@ownedPrimaryKey">
+      <properties>NotNull</properties>
+      <properties>AutoIncrement</properties>
+    </ownedColumns>
+    <ownedColumns name="Student" type="int" keys="//@ownedTables.0/@ownedForeignKeys.0">
+      <properties>Unique</properties>
+    </ownedColumns>
+    <ownedColumns name="Teacher" type="int" keys="//@ownedTables.0/@ownedForeignKeys.1">
+      <properties>Unique</properties>
+    </ownedColumns>
+    <ownedColumns name="OrganizationalEntity" type="int" keys="//@ownedTables.0/@ownedForeignKeys.2">
+      <properties>Unique</properties>
+    </ownedColumns>
+    <ownedColumns name="Person" type="int" keys="//@ownedTables.0/@ownedForeignKeys.3">
+      <properties>Unique</properties>
+    </ownedColumns>
+    <ownedColumns name="OrganizationalUnit" type="int" keys="//@ownedTables.0/@ownedForeignKeys.4">
+      <properties>Unique</properties>
+    </ownedColumns>
+    <ownedColumns name="Examination" type="int" keys="//@ownedTables.0/@ownedForeignKeys.5">
+      <properties>Unique</properties>
+    </ownedColumns>
+    <ownedColumns name="Lecture" type="int" keys="//@ownedTables.0/@ownedForeignKeys.6">
+      <properties>Unique</properties>
+    </ownedColumns>
+    <ownedColumns name="Semester" type="int" keys="//@ownedTables.0/@ownedForeignKeys.7">
+      <properties>Unique</properties>
+    </ownedColumns>
+    <ownedColumns name="Module" type="int" keys="//@ownedTables.0/@ownedForeignKeys.8">
+      <properties>Unique</properties>
+    </ownedColumns>
+    <ownedPrimaryKey column="//@ownedTables.0/@ownedColumns.0"/>
+    <ownedForeignKeys column="//@ownedTables.0/@ownedColumns.1" referencedTable="//@ownedTables.1">
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.0/@ownedColumns.2" referencedTable="//@ownedTables.2">
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.0/@ownedColumns.3" referencedTable="//@ownedTables.3">
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.0/@ownedColumns.4" referencedTable="//@ownedTables.4">
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.0/@ownedColumns.5" referencedTable="//@ownedTables.5">
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.0/@ownedColumns.6" referencedTable="//@ownedTables.6">
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.0/@ownedColumns.7" referencedTable="//@ownedTables.7">
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.0/@ownedColumns.8" referencedTable="//@ownedTables.8">
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.0/@ownedColumns.9" referencedTable="//@ownedTables.9">
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="Student" referencingForeignKeys="//@ownedTables.0/@ownedForeignKeys.0 //@ownedTables.11/@ownedForeignKeys.0 //@ownedTables.6/@ownedForeignKeys.3">
+    <ownedAnnotations annotation="class"/>
+    <ownedAnnotations annotation="concrete"/>
+    <ownedColumns name="id" type="int" keys="//@ownedTables.1/@ownedPrimaryKey //@ownedTables.1/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="studentNo" type="int">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedPrimaryKey column="//@ownedTables.1/@ownedColumns.0"/>
+    <ownedForeignKeys column="//@ownedTables.1/@ownedColumns.0" referencedTable="//@ownedTables.4">
+      <ownedAnnotations annotation="superType"/>
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="Teacher" referencingForeignKeys="//@ownedTables.0/@ownedForeignKeys.1 //@ownedTables.6/@ownedForeignKeys.1 //@ownedTables.13/@ownedForeignKeys.1">
+    <ownedAnnotations annotation="class"/>
+    <ownedAnnotations annotation="concrete"/>
+    <ownedColumns name="id" type="int" keys="//@ownedTables.2/@ownedPrimaryKey //@ownedTables.2/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="staffId" type="varchar(30)">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedPrimaryKey column="//@ownedTables.2/@ownedColumns.0"/>
+    <ownedForeignKeys column="//@ownedTables.2/@ownedColumns.0" referencedTable="//@ownedTables.4">
+      <ownedAnnotations annotation="superType"/>
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="OrganizationalEntity" referencingForeignKeys="//@ownedTables.0/@ownedForeignKeys.2 //@ownedTables.4/@ownedForeignKeys.0 //@ownedTables.5/@ownedForeignKeys.0">
+    <ownedAnnotations annotation="class"/>
+    <ownedAnnotations annotation="abstract"/>
+    <ownedColumns name="id" type="int" keys="//@ownedTables.3/@ownedPrimaryKey //@ownedTables.3/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="containedEntities_inverse" type="int" keys="//@ownedTables.3/@ownedForeignKeys.1">
+      <ownedAnnotations annotation="containment"/>
+      <ownedAnnotations annotation="unidirectional"/>
+      <ownedAnnotations annotation="multi"/>
+    </ownedColumns>
+    <ownedPrimaryKey column="//@ownedTables.3/@ownedColumns.0"/>
+    <ownedForeignKeys column="//@ownedTables.3/@ownedColumns.0" referencedTable="//@ownedTables.0">
+      <ownedAnnotations annotation="root"/>
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.3/@ownedColumns.1" referencedTable="//@ownedTables.5">
+      <ownedAnnotations annotation="containment"/>
+      <ownedAnnotations annotation="unidirectional"/>
+      <ownedAnnotations annotation="multi"/>
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="Person" referencingForeignKeys="//@ownedTables.0/@ownedForeignKeys.3 //@ownedTables.1/@ownedForeignKeys.0 //@ownedTables.2/@ownedForeignKeys.0 //@ownedTables.10/@ownedForeignKeys.0">
+    <ownedAnnotations annotation="class"/>
+    <ownedAnnotations annotation="abstract"/>
+    <ownedColumns name="id" type="int" keys="//@ownedTables.4/@ownedPrimaryKey //@ownedTables.4/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="lastName" type="varchar(30)">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedColumns name="birthday" type="date">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedColumns name="placeOfBirth" type="varchar(30)">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedPrimaryKey column="//@ownedTables.4/@ownedColumns.0"/>
+    <ownedForeignKeys column="//@ownedTables.4/@ownedColumns.0" referencedTable="//@ownedTables.3">
+      <ownedAnnotations annotation="superType"/>
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="OrganizationalUnit" referencingForeignKeys="//@ownedTables.0/@ownedForeignKeys.4 //@ownedTables.3/@ownedForeignKeys.1">
+    <ownedAnnotations annotation="class"/>
+    <ownedAnnotations annotation="concrete"/>
+    <ownedColumns name="id" type="int" keys="//@ownedTables.5/@ownedPrimaryKey //@ownedTables.5/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="name" type="varchar(30)">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedPrimaryKey column="//@ownedTables.5/@ownedColumns.0"/>
+    <ownedForeignKeys column="//@ownedTables.5/@ownedColumns.0" referencedTable="//@ownedTables.3">
+      <ownedAnnotations annotation="superType"/>
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="Examination" referencingForeignKeys="//@ownedTables.0/@ownedForeignKeys.5">
+    <ownedAnnotations annotation="class"/>
+    <ownedAnnotations annotation="concrete"/>
+    <ownedColumns name="id" type="int" keys="//@ownedTables.6/@ownedPrimaryKey //@ownedTables.6/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="date" type="date">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedColumns name="grade" type="int">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedColumns name="teacher" type="int" keys="//@ownedTables.6/@ownedForeignKeys.1">
+      <ownedAnnotations annotation="single"/>
+      <ownedAnnotations annotation="unidirectional"/>
+      <ownedAnnotations annotation="cross"/>
+    </ownedColumns>
+    <ownedColumns name="lecture" type="int" keys="//@ownedTables.6/@ownedForeignKeys.2">
+      <ownedAnnotations annotation="single"/>
+      <ownedAnnotations annotation="unidirectional"/>
+      <ownedAnnotations annotation="cross"/>
+    </ownedColumns>
+    <ownedColumns name="student" type="int" keys="//@ownedTables.6/@ownedForeignKeys.3">
+      <ownedAnnotations annotation="single"/>
+      <ownedAnnotations annotation="unidirectional"/>
+      <ownedAnnotations annotation="cross"/>
+    </ownedColumns>
+    <ownedColumns name="containingSemester_inverse_containedExaminations" type="int" keys="//@ownedTables.6/@ownedForeignKeys.4">
+      <ownedAnnotations annotation="containment"/>
+      <ownedAnnotations annotation="bidirectional"/>
+      <ownedAnnotations annotation="multi"/>
+    </ownedColumns>
+    <ownedPrimaryKey column="//@ownedTables.6/@ownedColumns.0"/>
+    <ownedForeignKeys column="//@ownedTables.6/@ownedColumns.0" referencedTable="//@ownedTables.0">
+      <ownedAnnotations annotation="root"/>
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.6/@ownedColumns.3" referencedTable="//@ownedTables.2">
+      <ownedAnnotations annotation="single"/>
+      <ownedAnnotations annotation="unidirectional"/>
+      <ownedAnnotations annotation="cross"/>
+      <ownedEvents action="SetNull"/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.6/@ownedColumns.4" referencedTable="//@ownedTables.7">
+      <ownedAnnotations annotation="single"/>
+      <ownedAnnotations annotation="unidirectional"/>
+      <ownedAnnotations annotation="cross"/>
+      <ownedEvents action="SetNull"/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.6/@ownedColumns.5" referencedTable="//@ownedTables.1">
+      <ownedAnnotations annotation="single"/>
+      <ownedAnnotations annotation="unidirectional"/>
+      <ownedAnnotations annotation="cross"/>
+      <ownedEvents action="SetNull"/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.6/@ownedColumns.6" referencedTable="//@ownedTables.8">
+      <ownedAnnotations annotation="containment"/>
+      <ownedAnnotations annotation="bidirectional"/>
+      <ownedAnnotations annotation="multi"/>
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="Lecture" referencingForeignKeys="//@ownedTables.0/@ownedForeignKeys.6 //@ownedTables.11/@ownedForeignKeys.1 //@ownedTables.6/@ownedForeignKeys.2 //@ownedTables.12/@ownedForeignKeys.0 //@ownedTables.12/@ownedForeignKeys.1 //@ownedTables.13/@ownedForeignKeys.0 //@ownedTables.14/@ownedForeignKeys.0">
+    <ownedAnnotations annotation="class"/>
+    <ownedAnnotations annotation="concrete"/>
+    <ownedColumns name="id" type="int" keys="//@ownedTables.7/@ownedPrimaryKey //@ownedTables.7/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="lectureNo" type="int">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedColumns name="title" type="varchar(30)">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedPrimaryKey column="//@ownedTables.7/@ownedColumns.0"/>
+    <ownedForeignKeys column="//@ownedTables.7/@ownedColumns.0" referencedTable="//@ownedTables.0">
+      <ownedAnnotations annotation="root"/>
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="Semester" referencingForeignKeys="//@ownedTables.0/@ownedForeignKeys.7 //@ownedTables.6/@ownedForeignKeys.4">
+    <ownedAnnotations annotation="class"/>
+    <ownedAnnotations annotation="concrete"/>
+    <ownedColumns name="id" type="int" keys="//@ownedTables.8/@ownedPrimaryKey //@ownedTables.8/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="year" type="int">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedColumns name="winter" type="boolean">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedPrimaryKey column="//@ownedTables.8/@ownedColumns.0"/>
+    <ownedForeignKeys column="//@ownedTables.8/@ownedColumns.0" referencedTable="//@ownedTables.0">
+      <ownedAnnotations annotation="root"/>
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="Module" referencingForeignKeys="//@ownedTables.0/@ownedForeignKeys.8 //@ownedTables.14/@ownedForeignKeys.1">
+    <ownedAnnotations annotation="class"/>
+    <ownedAnnotations annotation="concrete"/>
+    <ownedColumns name="id" type="int" keys="//@ownedTables.9/@ownedPrimaryKey //@ownedTables.9/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="name" type="varchar(30)">
+      <ownedAnnotations annotation="attribute"/>
+      <ownedAnnotations annotation="single"/>
+    </ownedColumns>
+    <ownedPrimaryKey column="//@ownedTables.9/@ownedColumns.0"/>
+    <ownedForeignKeys column="//@ownedTables.9/@ownedColumns.0" referencedTable="//@ownedTables.0">
+      <ownedAnnotations annotation="root"/>
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="Person_firstNames">
+    <ownedAnnotations annotation="attribute"/>
+    <ownedAnnotations annotation="multi"/>
+    <ownedColumns name="id" type="int" keys="//@ownedTables.10/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="value" type="varchar(30)">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedForeignKeys column="//@ownedTables.10/@ownedColumns.0" referencedTable="//@ownedTables.4">
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="Student_lectures">
+    <ownedAnnotations annotation="cross"/>
+    <ownedAnnotations annotation="multi"/>
+    <ownedAnnotations annotation="unidirectional"/>
+    <ownedColumns name="id" type="int" keys="//@ownedTables.11/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="reference" type="int" keys="//@ownedTables.11/@ownedForeignKeys.1">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedForeignKeys column="//@ownedTables.11/@ownedColumns.0" referencedTable="//@ownedTables.1">
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.11/@ownedColumns.1" referencedTable="//@ownedTables.7">
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="Lecture_requiredByLectures_inverse_Lecture_requiredLectures">
+    <ownedAnnotations annotation="cross"/>
+    <ownedAnnotations annotation="bidirectional"/>
+    <ownedAnnotations annotation="forwardMulti"/>
+    <ownedAnnotations annotation="backwardMulti"/>
+    <ownedColumns name="source" type="int" keys="//@ownedTables.12/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="target" type="int" keys="//@ownedTables.12/@ownedForeignKeys.1">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedForeignKeys column="//@ownedTables.12/@ownedColumns.0" referencedTable="//@ownedTables.7">
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.12/@ownedColumns.1" referencedTable="//@ownedTables.7">
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="Lecture_teacher_inverse_Teacher_lectures">
+    <ownedAnnotations annotation="cross"/>
+    <ownedAnnotations annotation="bidirectional"/>
+    <ownedAnnotations annotation="forwardSingle"/>
+    <ownedAnnotations annotation="backwardMulti"/>
+    <ownedColumns name="source" type="int" keys="//@ownedTables.13/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="target" type="int" keys="//@ownedTables.13/@ownedForeignKeys.1">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedForeignKeys column="//@ownedTables.13/@ownedColumns.0" referencedTable="//@ownedTables.7">
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.13/@ownedColumns.1" referencedTable="//@ownedTables.2">
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+  <ownedTables name="Lecture_module_inverse_Module_lecture">
+    <ownedAnnotations annotation="cross"/>
+    <ownedAnnotations annotation="bidirectional"/>
+    <ownedAnnotations annotation="forwardSingle"/>
+    <ownedAnnotations annotation="backwardSingle"/>
+    <ownedColumns name="source" type="int" keys="//@ownedTables.14/@ownedForeignKeys.0">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedColumns name="target" type="int" keys="//@ownedTables.14/@ownedForeignKeys.1">
+      <properties>NotNull</properties>
+    </ownedColumns>
+    <ownedForeignKeys column="//@ownedTables.14/@ownedColumns.0" referencedTable="//@ownedTables.7">
+      <ownedEvents/>
+    </ownedForeignKeys>
+    <ownedForeignKeys column="//@ownedTables.14/@ownedColumns.1" referencedTable="//@ownedTables.9">
+      <ownedEvents/>
+    </ownedForeignKeys>
+  </ownedTables>
+</sql:Schema>

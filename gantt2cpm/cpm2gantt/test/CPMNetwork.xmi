@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cpm:CPMNetwork xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:cpm="http://de.ubt.ai1.bw.qvt.examples.cpm.ecore" xsi:schemaLocation="http://de.ubt.ai1.bw.qvt.examples.cpm.ecore CPM.ecore" name="Example">
+  <elements xsi:type="cpm:Activity" sourceEvent="//@elements.1" targetEvent="//@elements.2" name="A1" duration="2"/>
+  <elements xsi:type="cpm:Event" outgoingActivities="//@elements.0" number="1"/>
+  <elements xsi:type="cpm:Event" outgoingActivities="//@elements.10" incomingActivities="//@elements.0" number="2"/>
+  <elements xsi:type="cpm:Activity" sourceEvent="//@elements.4" targetEvent="//@elements.5" name="A2" duration="3"/>
+  <elements xsi:type="cpm:Event" outgoingActivities="//@elements.3 //@elements.9" number="3"/>
+  <elements xsi:type="cpm:Event" incomingActivities="//@elements.3 //@elements.10" number="4"/>
+  <elements xsi:type="cpm:Activity" sourceEvent="//@elements.7" targetEvent="//@elements.8" name="A3" duration="4"/>
+  <elements xsi:type="cpm:Event" outgoingActivities="//@elements.6" incomingActivities="//@elements.9" number="5"/>
+  <elements xsi:type="cpm:Event" incomingActivities="//@elements.6" number="6"/>
+  <elements xsi:type="cpm:Activity" sourceEvent="//@elements.4" targetEvent="//@elements.7" name="A2->A3" duration="2"/>
+  <elements xsi:type="cpm:Activity" sourceEvent="//@elements.2" targetEvent="//@elements.5" name="A1->A2"/>
+</cpm:CPMNetwork>
