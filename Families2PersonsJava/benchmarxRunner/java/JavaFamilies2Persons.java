@@ -37,16 +37,15 @@ public class JavaFamilies2Persons extends BXToolForEMF<FamilyRegister, PersonReg
 	private FamilyRegister familiesRoot;
 	private PersonRegister personRoot;
 
-	private static final String RESULTPATH = "results/ChatGPT";
+	private static final String RESULTPATH = "results/Java";
 
 	public JavaFamilies2Persons() {
 		super(new FamiliesComparator(), new PersonsComparator());
-		// TODO Auto-generated constructor stub
 	}
 	
 	@Override
 	public String getName() {
-		return "ChatGPT Transformation";
+		return "Java Transformation";
 	}
 
 	@Override
@@ -78,7 +77,7 @@ public class JavaFamilies2Persons extends BXToolForEMF<FamilyRegister, PersonReg
 	@Override
 	public void performAndPropagateTargetEdit(Supplier<IEdit<PersonRegister>> edit) {
 		edit.get();
-		javaTrans.transformPersonsToFamilies(personRoot, familiesRoot, 
+		javaTrans.backward(personRoot, familiesRoot, 
 				conf.decide(Decisions.PREFER_EXISTING_FAMILY_TO_NEW), conf.decide(Decisions.PREFER_CREATING_PARENT_TO_CHILD));
 	}
 
@@ -91,14 +90,18 @@ public class JavaFamilies2Persons extends BXToolForEMF<FamilyRegister, PersonReg
 	@Override
 	public void performAndPropagateSourceEdit(Supplier<IEdit<FamilyRegister>> edit) {
 		edit.get();		
-		javaTrans.transformFamiliesToPersons(familiesRoot, personRoot);
+		javaTrans.forward(familiesRoot, personRoot);
 	}	
 
 	@Override
 	public void performAndPropagateEdit(Supplier<IEdit<FamilyRegister>> sourceEdit,
 			Supplier<IEdit<PersonRegister>> targetEdit) {
 		// TODO Auto-generated method stub
-		fail("Concurrent edits not supported.");
+		//fail("Concurrent edits not supported.");
+		sourceEdit.get();
+		targetEdit.get();
+		javaTrans.synch(familiesRoot, personRoot, 
+				conf.decide(Decisions.PREFER_EXISTING_FAMILY_TO_NEW), conf.decide(Decisions.PREFER_CREATING_PARENT_TO_CHILD));
 	}
 
 	@Override
