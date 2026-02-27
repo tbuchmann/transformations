@@ -1,0 +1,13 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Pdb12pdb2
+Bundle-SymbolicName: de.tbuchmann.bxagent.pdb12pdb2
+Bundle-Version: 1.0.0.qualifier
+Require-Bundle: org.eclipse.swt,
+ org.eclipse.jface,
+ PDB1;bundle-version="1.0.0",
+ PDB2;bundle-version="1.0.0",
+ org.eclipse.emf.ecore.xmi;bundle-version="2.39.0"
+Automatic-Module-Name: de.tbuchmann.bxagent.pdb12pdb2
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Export-Package: de.tbuchmann.bxagent.pdb12pdb2

@@ -1,0 +1,12 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: F2p
+Bundle-SymbolicName: de.tbuchmann.bxagent.f2p
+Bundle-Version: 1.0.0.qualifier
+Require-Bundle: org.eclipse.swt,
+ org.eclipse.jface,
+ Families;bundle-version="1.0.0",
+ Persons;bundle-version="1.0.0",
+ org.eclipse.emf.ecore;bundle-version="2.40.0"
+Automatic-Module-Name: de.tbuchmann.bxagent.f2p
+Bundle-RequiredExecutionEnvironment: JavaSE-21

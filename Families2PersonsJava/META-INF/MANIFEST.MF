@@ -10,3 +10,4 @@ Require-Bundle: Families;bundle-version="1.0.0",
  com.google.guava;bundle-version="33.5.0"
 Automatic-Module-Name: Families2PersonsJava
 Bundle-RequiredExecutionEnvironment: JavaSE-21
+Export-Package: de.tbuchmann.m2m.f2p.java
