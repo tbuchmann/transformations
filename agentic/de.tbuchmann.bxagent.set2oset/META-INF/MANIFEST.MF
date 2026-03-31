@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Set2oset
+Bundle-SymbolicName: de.tbuchmann.bxagent.set2oset
+Bundle-Version: 1.0.0.qualifier
+Require-Bundle: OSet;bundle-version="1.0.0",
+ Set;bundle-version="1.0.0"
+Automatic-Module-Name: de.tbuchmann.bxagent.set2oset
+Bundle-RequiredExecutionEnvironment: JavaSE-21

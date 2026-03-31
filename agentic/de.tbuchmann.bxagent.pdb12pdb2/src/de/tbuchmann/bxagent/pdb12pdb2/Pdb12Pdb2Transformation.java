@@ -5,8 +5,15 @@ import pdb1.*;
 import pdb2.*;
 import org.eclipse.emf.ecore.*;
 import org.eclipse.emf.ecore.resource.*;
+import org.eclipse.emf.ecore.xmi.XMIResource;
 import org.eclipse.emf.ecore.util.EcoreUtil;
+import org.eclipse.emf.common.util.EList;
 import java.util.*;
+import dev.emtagent.correspondence.CorrespondenceModel;
+import dev.emtagent.correspondence.TransformationContext;
+import dev.emtagent.correspondence.SyncConflictPolicy;
+import dev.emtagent.correspondence.SyncConflict;
+import dev.emtagent.correspondence.SyncResult;
 
 /**
  * Bidirectional EMF transformation: pdb1 ↔ pdb2
@@ -22,10 +29,11 @@ public class Pdb12Pdb2Transformation {
 
     /**
      * Configuration options for non-deterministic transformation steps.
+     * Includes both attribute-level options and structural backward-direction parameters.
      * Pass to transform() or transformBack() to control ambiguous mappings.
      */
     public record Options(
-        String nameBackwardSplitStrategy  // Controls how the name field is split back into firstName and lastName. 'first' splits at the first blank, 'last' splits at the last blank.
+        String nameBackwardSplitStrategy  // Controls whether to split the name at the first or last blank during backward transformation. 'first' splits at the first blank, 'last' splits at the last blank.
     ) {
         /** Default options. */
         public static Options defaults() {
@@ -36,35 +44,283 @@ public class Pdb12Pdb2Transformation {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // Public Entry Points - Resource-level Transformation
+    // Post-Processor Hook
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Optional post-processing hook for derived structure that cannot be expressed
+     * as attribute or reference mappings (e.g. building a linked list from containment order).
+     * Pass to any transform() or transformBack() overload.
+     */
+    public interface PostProcessor {
+        /**
+         * Called before target objects are deleted (incremental mode only, CASCADE policy).
+         * Use to repair derived relationships (e.g. re-link neighbors in a linked list)
+         * while the objects are still reachable in the model.
+         */
+        default void beforeDeletions(List<EObject> targetObjectsToDelete) {}
+
+        /**
+         * Called after all phases of the transformation complete (batch and incremental).
+         *
+         * @param readFrom  the resource that was read (source model in forward, target model in backward)
+         * @param writeTo   the resource that was written (target model in forward, source model in backward)
+         * @param objectMap correspondence map: readFrom object → writeTo object
+         * @param created   newly created writeTo objects (in batch mode: all non-root objects)
+         * @param updated   attribute-updated writeTo objects (empty in batch mode)
+         */
+        default void afterTransform(Resource readFrom, Resource writeTo,
+                                     Map<EObject, EObject> objectMap,
+                                     List<EObject> created,
+                                     List<EObject> updated) {}
+
+        /** No-op implementation used by all overloads that do not supply a PostProcessor. */
+        PostProcessor NOOP = new PostProcessor() {};
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Public Entry Points — Forward
     // ════════════════════════════════════════════════════════════════════════
 
     /**
      * Transforms the contents of sourceResource into targetResource using default options.
-     * Both resources must already exist and the root elements must be pre-created.
-     *
-     * @param sourceResource Source EMF resource (read)
-     * @param targetResource Target EMF resource (written into, root elements must exist)
+     * Both resources must already exist and root elements must be pre-created.
      */
     public static void transform(Resource sourceResource, Resource targetResource) {
-        transform(sourceResource, targetResource, Options.defaults());
+        transform(sourceResource, targetResource, Options.defaults(), PostProcessor.NOOP);
+    }
+
+    /** Batch transform with post-processing hook. */
+    public static void transform(Resource sourceResource, Resource targetResource, PostProcessor postProcessor) {
+        transform(sourceResource, targetResource, Options.defaults(), postProcessor);
     }
 
     /**
      * Transforms the contents of sourceResource into targetResource.
-     * Both resources must already exist and the root elements must be pre-created.
-     * Uses two-phase transformation: (1) create contained objects, (2) resolve cross-references.
-     *
-     * @param sourceResource Source EMF resource (read)
-     * @param targetResource Target EMF resource (written into, root elements must exist)
-     * @param options Configuration options for non-deterministic mappings
+     * Both resources must already exist and root elements must be pre-created.
+     * After a successful batch transformation a correspondence model is created automatically.
      */
     public static void transform(Resource sourceResource, Resource targetResource, Options options) {
+        transform(sourceResource, targetResource, options, PostProcessor.NOOP);
+    }
+
+    /** Batch transform with options and post-processing hook. */
+    public static void transform(Resource sourceResource, Resource targetResource, Options options, PostProcessor postProcessor) {
         if (sourceResource == null || targetResource == null) {
             return;
         }
+        TransformationContext ctx = TransformationContext.builder()
+                .sourceModel(sourceResource)
+                .existingTarget(targetResource)
+                .direction(TransformationContext.Direction.SOURCE_TO_TARGET)
+                .build();
+        transform(ctx, options, postProcessor);
+    }
 
-        // Object mapping for cross-reference resolution
+    /**
+     * Incrementally transforms sourceResource into targetResource using the supplied correspondence model.
+     * The correspondence model must have been created by a previous batch transformation.
+     */
+    public static void transform(Resource sourceResource, Resource targetResource, Resource corrResource) {
+        transform(sourceResource, targetResource, corrResource, Options.defaults(), PostProcessor.NOOP);
+    }
+
+    /** Incremental transform with post-processing hook. */
+    public static void transform(Resource sourceResource, Resource targetResource, Resource corrResource, PostProcessor postProcessor) {
+        transform(sourceResource, targetResource, corrResource, Options.defaults(), postProcessor);
+    }
+
+    /**
+     * Incrementally transforms sourceResource into targetResource using the supplied correspondence model.
+     * The correspondence model must have been created by a previous batch transformation.
+     */
+    public static void transform(Resource sourceResource, Resource targetResource, Resource corrResource, Options options) {
+        transform(sourceResource, targetResource, corrResource, options, PostProcessor.NOOP);
+    }
+
+    /** Incremental transform with options and post-processing hook. */
+    public static void transform(Resource sourceResource, Resource targetResource, Resource corrResource, Options options, PostProcessor postProcessor) {
+        transform(sourceResource, targetResource, corrResource, TransformationContext.DeletionPolicy.TOMBSTONE, options, postProcessor);
+    }
+
+    /** Incremental transform with explicit deletion policy. */
+    public static void transform(Resource sourceResource, Resource targetResource, Resource corrResource, TransformationContext.DeletionPolicy deletionPolicy) {
+        transform(sourceResource, targetResource, corrResource, deletionPolicy, Options.defaults(), PostProcessor.NOOP);
+    }
+
+    /** Incremental transform with explicit deletion policy and post-processing hook. */
+    public static void transform(Resource sourceResource, Resource targetResource, Resource corrResource, TransformationContext.DeletionPolicy deletionPolicy, PostProcessor postProcessor) {
+        transform(sourceResource, targetResource, corrResource, deletionPolicy, Options.defaults(), postProcessor);
+    }
+
+    /** Incremental transform with explicit deletion policy and options. */
+    public static void transform(Resource sourceResource, Resource targetResource, Resource corrResource, TransformationContext.DeletionPolicy deletionPolicy, Options options) {
+        transform(sourceResource, targetResource, corrResource, deletionPolicy, options, PostProcessor.NOOP);
+    }
+
+    /** Incremental transform with explicit deletion policy, options and post-processing hook. */
+    public static void transform(Resource sourceResource, Resource targetResource, Resource corrResource, TransformationContext.DeletionPolicy deletionPolicy, Options options, PostProcessor postProcessor) {
+        if (sourceResource == null || targetResource == null || corrResource == null) {
+            return;
+        }
+        TransformationContext ctx = TransformationContext.builder()
+                .sourceModel(sourceResource)
+                .existingTarget(targetResource)
+                .corrModel(corrResource)
+                .direction(TransformationContext.Direction.SOURCE_TO_TARGET)
+                .deletionPolicy(deletionPolicy)
+                .build();
+        transform(ctx, options, postProcessor);
+    }
+
+    /** Incremental-aware transform using default options. */
+    public static void transform(TransformationContext ctx) {
+        transform(ctx, Options.defaults(), PostProcessor.NOOP);
+    }
+
+    /** Incremental-aware transform. Dispatches to batch or incremental path based on ctx. */
+    public static void transform(TransformationContext ctx, Options options) {
+        transform(ctx, options, PostProcessor.NOOP);
+    }
+
+    /** Incremental-aware transform with post-processing hook. */
+    public static void transform(TransformationContext ctx, PostProcessor postProcessor) {
+        transform(ctx, Options.defaults(), postProcessor);
+    }
+
+    /** Incremental-aware transform with options and post-processing hook. */
+    public static void transform(TransformationContext ctx, Options options, PostProcessor postProcessor) {
+        if (ctx.isIncremental()) {
+            transformIncremental(ctx, options, postProcessor);
+        } else {
+            transformBatch(ctx, options, postProcessor);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Public Entry Points — Backward
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Transforms the contents of targetResource back into sourceResource using default options.
+     */
+    public static void transformBack(Resource targetResource, Resource sourceResource) {
+        transformBack(targetResource, sourceResource, Options.defaults(), PostProcessor.NOOP);
+    }
+
+    /** Batch backward transform with post-processing hook. */
+    public static void transformBack(Resource targetResource, Resource sourceResource, PostProcessor postProcessor) {
+        transformBack(targetResource, sourceResource, Options.defaults(), postProcessor);
+    }
+
+    /**
+     * Transforms the contents of targetResource back into sourceResource.
+     */
+    public static void transformBack(Resource targetResource, Resource sourceResource, Options options) {
+        transformBack(targetResource, sourceResource, options, PostProcessor.NOOP);
+    }
+
+    /** Batch backward transform with options and post-processing hook. */
+    public static void transformBack(Resource targetResource, Resource sourceResource, Options options, PostProcessor postProcessor) {
+        if (targetResource == null || sourceResource == null) {
+            return;
+        }
+        TransformationContext ctx = TransformationContext.builder()
+                .sourceModel(targetResource)
+                .existingTarget(sourceResource)
+                .direction(TransformationContext.Direction.TARGET_TO_SOURCE)
+                .build();
+        transformBack(ctx, options, postProcessor);
+    }
+
+    /**
+     * Incrementally transforms targetResource back into sourceResource using the supplied correspondence model.
+     * The correspondence model must have been created by a previous batch transformation.
+     */
+    public static void transformBack(Resource targetResource, Resource sourceResource, Resource corrResource) {
+        transformBack(targetResource, sourceResource, corrResource, Options.defaults(), PostProcessor.NOOP);
+    }
+
+    /** Incremental backward transform with post-processing hook. */
+    public static void transformBack(Resource targetResource, Resource sourceResource, Resource corrResource, PostProcessor postProcessor) {
+        transformBack(targetResource, sourceResource, corrResource, Options.defaults(), postProcessor);
+    }
+
+    /**
+     * Incrementally transforms targetResource back into sourceResource using the supplied correspondence model.
+     * The correspondence model must have been created by a previous batch transformation.
+     */
+    public static void transformBack(Resource targetResource, Resource sourceResource, Resource corrResource, Options options) {
+        transformBack(targetResource, sourceResource, corrResource, options, PostProcessor.NOOP);
+    }
+
+    /** Incremental backward transform with options and post-processing hook. */
+    public static void transformBack(Resource targetResource, Resource sourceResource, Resource corrResource, Options options, PostProcessor postProcessor) {
+        transformBack(targetResource, sourceResource, corrResource, TransformationContext.DeletionPolicy.TOMBSTONE, options, postProcessor);
+    }
+
+    /** Incremental backward transform with explicit deletion policy. */
+    public static void transformBack(Resource targetResource, Resource sourceResource, Resource corrResource, TransformationContext.DeletionPolicy deletionPolicy) {
+        transformBack(targetResource, sourceResource, corrResource, deletionPolicy, Options.defaults(), PostProcessor.NOOP);
+    }
+
+    /** Incremental backward transform with explicit deletion policy and post-processing hook. */
+    public static void transformBack(Resource targetResource, Resource sourceResource, Resource corrResource, TransformationContext.DeletionPolicy deletionPolicy, PostProcessor postProcessor) {
+        transformBack(targetResource, sourceResource, corrResource, deletionPolicy, Options.defaults(), postProcessor);
+    }
+
+    /** Incremental backward transform with explicit deletion policy and options. */
+    public static void transformBack(Resource targetResource, Resource sourceResource, Resource corrResource, TransformationContext.DeletionPolicy deletionPolicy, Options options) {
+        transformBack(targetResource, sourceResource, corrResource, deletionPolicy, options, PostProcessor.NOOP);
+    }
+
+    /** Incremental backward transform with explicit deletion policy, options and post-processing hook. */
+    public static void transformBack(Resource targetResource, Resource sourceResource, Resource corrResource, TransformationContext.DeletionPolicy deletionPolicy, Options options, PostProcessor postProcessor) {
+        if (targetResource == null || sourceResource == null || corrResource == null) {
+            return;
+        }
+        TransformationContext ctx = TransformationContext.builder()
+                .sourceModel(targetResource)
+                .existingTarget(sourceResource)
+                .corrModel(corrResource)
+                .direction(TransformationContext.Direction.TARGET_TO_SOURCE)
+                .deletionPolicy(deletionPolicy)
+                .build();
+        transformBack(ctx, options, postProcessor);
+    }
+
+    /** Incremental-aware backward transform using default options. */
+    public static void transformBack(TransformationContext ctx) {
+        transformBack(ctx, Options.defaults(), PostProcessor.NOOP);
+    }
+
+    /** Incremental-aware backward transform. */
+    public static void transformBack(TransformationContext ctx, Options options) {
+        transformBack(ctx, options, PostProcessor.NOOP);
+    }
+
+    /** Incremental-aware backward transform with post-processing hook. */
+    public static void transformBack(TransformationContext ctx, PostProcessor postProcessor) {
+        transformBack(ctx, Options.defaults(), postProcessor);
+    }
+
+    /** Incremental-aware backward transform with options and post-processing hook. */
+    public static void transformBack(TransformationContext ctx, Options options, PostProcessor postProcessor) {
+        if (ctx.isIncremental()) {
+            transformIncrementalBack(ctx, options, postProcessor);
+        } else {
+            transformBatchBack(ctx, options, postProcessor);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Batch Forward Path
+    // ════════════════════════════════════════════════════════════════════════
+
+    private static void transformBatch(TransformationContext ctx, Options options, PostProcessor postProcessor) {
+        Resource sourceResource = ctx.getSourceModel();
+        Resource targetResource = ctx.getExistingTarget();
+
         Map<EObject, EObject> objectMap = new HashMap<>();
         Set<EObject> visited = new HashSet<>();
 
@@ -86,34 +342,137 @@ public class Pdb12Pdb2Transformation {
 
         // Phase 2: Resolve all cross-references
         resolveReferences(objectMap);
-    }
 
-    /**
-     * Transforms the contents of targetResource back into sourceResource using default options.
-     * Both resources must already exist and the root elements must be pre-created.
-     *
-     * @param targetResource Target EMF resource (read)
-     * @param sourceResource Source EMF resource (written into, root elements must exist)
-     */
-    public static void transformBack(Resource targetResource, Resource sourceResource) {
-        transformBack(targetResource, sourceResource, Options.defaults());
-    }
-
-    /**
-     * Transforms the contents of targetResource back into sourceResource.
-     * Both resources must already exist and the root elements must be pre-created.
-     * Uses two-phase transformation: (1) create contained objects, (2) resolve cross-references.
-     *
-     * @param targetResource Target EMF resource (read)
-     * @param sourceResource Source EMF resource (written into, root elements must exist)
-     * @param options Configuration options for non-deterministic mappings
-     */
-    public static void transformBack(Resource targetResource, Resource sourceResource, Options options) {
-        if (targetResource == null || sourceResource == null) {
-            return;
+        // After batch: create correspondence model (if resources have persistent URIs)
+        if (sourceResource.getURI() != null && targetResource.getURI() != null
+                && sourceResource.getResourceSet() != null) {
+            org.eclipse.emf.common.util.URI corrURI = CorrespondenceModel.deriveCorrespondenceURI(
+                    sourceResource.getURI(), targetResource.getURI());
+            Resource corrResource = CorrespondenceModel.loadOrCreate(corrURI, sourceResource.getResourceSet());
+            // Batch always rebuilds the correspondence from scratch — clear stale entries first.
+            corrResource.getContents().clear();
+            for (Map.Entry<EObject, EObject> entry : objectMap.entrySet()) {
+                String _srcCR = entry.getKey().eContainmentFeature() != null ? entry.getKey().eContainmentFeature().getName() : "";
+                String _tgtCR = entry.getValue().eContainmentFeature() != null ? entry.getValue().eContainmentFeature().getName() : "";
+                CorrespondenceModel.addEntry(corrResource,
+                        entry.getKey(), entry.getKey().eClass().getName(),
+                        computeFingerprint(entry.getKey()),
+                        entry.getValue(), entry.getValue().eClass().getName(),
+                        computeFingerprintBack(entry.getValue()),
+                        _srcCR, _tgtCR);
+            }
+            CorrespondenceModel.saveAndUpdateTimestamp(corrResource);
         }
 
-        // Object mapping for cross-reference resolution
+        // Post-processing: all non-root target objects are "created" in batch mode
+        List<EObject> _batchCreated = new ArrayList<>(objectMap.values());
+        targetRoots.forEach(_batchCreated::remove);
+        postProcessor.afterTransform(sourceResource, targetResource, objectMap, _batchCreated, List.of());
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Incremental Forward Path
+    // ════════════════════════════════════════════════════════════════════════
+
+    private static void transformIncremental(TransformationContext ctx, Options options, PostProcessor postProcessor) {
+        Resource sourceModel   = ctx.getSourceModel();
+        Resource existingTarget = ctx.getExistingTarget();
+        Resource corrResource  = ctx.getCorrModel();
+        com.google.common.collect.BiMap<EObject, EObject> corrIndex = ctx.getCorrIndex();
+        List<EObject> _created = new ArrayList<>();
+        List<EObject> _updated = new ArrayList<>();
+
+        // Phase 1: Regular typed objects (TypeMappings only).
+        // Role-based source types (e.g. FamilyMember) are handled exclusively in Phase 1b
+        // to avoid consuming their change signal before mapRoleBasedTypesIncremental runs.
+        for (EObject srcObj : allSourceObjects(sourceModel)) {
+            if (!isCoveredByTypeMappingSource(srcObj)) continue;
+            String currentFp = computeFingerprint(srcObj);
+            Optional<EObject> existingEntry = CorrespondenceModel.findBySource(corrResource, srcObj);
+
+            if (existingEntry.isEmpty()) {
+                // New object: create and add to target containment
+                EObject newTarget = createNewTargetObject(srcObj, options);
+                if (newTarget != null) {
+                    addToTargetContainment(srcObj, newTarget, existingTarget, corrIndex);
+                    String _srcCR = srcObj.eContainmentFeature() != null ? srcObj.eContainmentFeature().getName() : "";
+                    String _tgtCR = newTarget.eContainmentFeature() != null ? newTarget.eContainmentFeature().getName() : "";
+                    CorrespondenceModel.addEntry(corrResource,
+                            srcObj, srcObj.eClass().getName(), currentFp,
+                            newTarget, newTarget.eClass().getName(), computeFingerprintBack(newTarget), _srcCR, _tgtCR);
+                    corrIndex.put(srcObj, newTarget);
+                    _created.add(newTarget);
+                }
+            } else {
+                // Known: check containment role and fingerprint for changes
+                String _currentSrcRole = srcObj.eContainmentFeature() != null ? srcObj.eContainmentFeature().getName() : "";
+                String _storedSrcRole  = CorrespondenceModel.getSourceContainmentRole(existingEntry.get());
+                if (_storedSrcRole == null) _storedSrcRole = "";
+                if (!_currentSrcRole.equals(_storedSrcRole)) {
+                    // Containment role changed for a TypeMapping object.
+                    // Update the stored role; for role-based types this is handled in Phase 1b.
+                    CorrespondenceModel.updateSourceContainmentRole(existingEntry.get(), _currentSrcRole);
+                }
+                String storedFp = CorrespondenceModel.getFingerprint(existingEntry.get());
+                if (!currentFp.equals(storedFp)) {
+                    EObject targetObj = corrIndex.get(srcObj);
+                    if (targetObj != null) {
+                        updateTargetAttributes(srcObj, targetObj, options);
+                        CorrespondenceModel.updateFingerprint(existingEntry.get(), currentFp);
+                        _updated.add(targetObj);
+                    }
+                }
+            }
+        }
+
+        // Phase 2: Detect and handle deleted source objects
+        // EMF nullifies CE_SOURCE_OBJECT when the object is deleted from the resource,
+        // so we scan for entries with null sourceObject rather than comparing allSourceObjects with corrIndex.
+        List<EObject> _deletedFwdEntries = new ArrayList<>(CorrespondenceModel.findDeletedSourceEntries(corrResource));
+        // Notify post-processor before actual deletion (CASCADE only) so derived structure can be repaired first
+        if (ctx.getDeletionPolicy() == TransformationContext.DeletionPolicy.CASCADE) {
+            List<EObject> _toDelete = new ArrayList<>();
+            for (EObject _corrEntry : _deletedFwdEntries) {
+                EObject targetObj = CorrespondenceModel.getTargetObject(_corrEntry);
+                if (targetObj != null) _toDelete.add(targetObj);
+            }
+            postProcessor.beforeDeletions(_toDelete);
+        }
+        for (EObject _corrEntry : _deletedFwdEntries) {
+            EObject targetObj = CorrespondenceModel.getTargetObject(_corrEntry);
+            switch (ctx.getDeletionPolicy()) {
+                case CASCADE -> {
+                    if (targetObj != null) {
+                        EcoreUtil.delete(targetObj, true);
+                    }
+                    CorrespondenceModel.removeCorrespondenceEntry(corrResource, _corrEntry);
+                }
+                case ORPHAN -> CorrespondenceModel.removeCorrespondenceEntry(corrResource, _corrEntry);
+                case TOMBSTONE -> CorrespondenceModel.markOrphaned(_corrEntry);
+            }
+        }
+
+        // Phase 3: Resolve cross-references incrementally using corrIndex as lookup.
+        // Must run after Phase 1 so all new objects are in corrIndex.
+        // Iterates all source objects (not just changed ones) because cross-reference changes
+        // are not captured by the fingerprint.
+        resolveReferencesIncremental(sourceModel, existingTarget, corrIndex);
+
+        CorrespondenceModel.saveAndUpdateTimestamp(corrResource);
+
+        postProcessor.afterTransform(sourceModel, existingTarget, corrIndex, _created, _updated);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Batch Backward Path
+    // ════════════════════════════════════════════════════════════════════════
+
+    private static void transformBatchBack(TransformationContext ctx, Options options, PostProcessor postProcessor) {
+        // In backward direction: ctx.getSourceModel() = target model (read from)
+        //                        ctx.getExistingTarget() = source model (written to)
+        Resource targetResource = ctx.getSourceModel();
+        Resource sourceResource = ctx.getExistingTarget();
+
         Map<EObject, EObject> objectMap = new HashMap<>();
         Set<EObject> visited = new HashSet<>();
 
@@ -135,6 +494,117 @@ public class Pdb12Pdb2Transformation {
 
         // Phase 2: Resolve all cross-references
         resolveReferencesBack(objectMap);
+
+        // Post-processing: all non-root source objects are "created" in batch backward mode
+        List<EObject> _batchBackCreated = new ArrayList<>(objectMap.values());
+        sourceRoots.forEach(_batchBackCreated::remove);
+        postProcessor.afterTransform(targetResource, sourceResource, objectMap, _batchBackCreated, List.of());
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Incremental Backward Path
+    // ════════════════════════════════════════════════════════════════════════
+
+    private static void transformIncrementalBack(TransformationContext ctx, Options options, PostProcessor postProcessor) {
+        // In backward direction:
+        // ctx.getSourceModel()    = target model (what we read from, in forward naming = "target")
+        // ctx.getExistingTarget() = source model (what we write to, in forward naming = "source")
+        Resource targetModel  = ctx.getSourceModel();
+        Resource sourceModel  = ctx.getExistingTarget();
+        Resource corrResource = ctx.getCorrModel();
+        // corrIndex is forward: source→target.  corrIndex.inverse() is target→source.
+        com.google.common.collect.BiMap<EObject, EObject> corrIndex = ctx.getCorrIndex();
+        List<EObject> _createdBack = new ArrayList<>();
+        List<EObject> _updatedBack = new ArrayList<>();
+
+        // Phase 1: All typed objects — TypeMappings AND role-based target types.
+        // For TypeMapping objects: update attributes + fingerprint here.
+        // For role-based objects (e.g. Male/Female): update simple attributes here but
+        //   do NOT update the fingerprint — Phase 1b (mapRoleBasedTypesIncrementalBack)
+        //   needs to see the mismatch to apply structural changes (e.g. family moves)
+        //   before committing the new fingerprint.
+        for (EObject tgtObj : allSourceObjects(targetModel)) {
+            if (!corrIndex.inverse().containsKey(tgtObj)) {
+                // New target object — only create if it's a TypeMapping type.
+                // New role-based objects are handled in Phase 1b.
+                if (!isCoveredByTypeMappingTarget(tgtObj)) continue;
+                EObject newSource = createNewSourceObject(tgtObj, options);
+                if (newSource != null) {
+                    addToSourceContainment(tgtObj, newSource, sourceModel, corrIndex);
+                    String srcFp = computeFingerprint(newSource);
+                    String tgtFp = computeFingerprintBack(tgtObj);
+                    String _srcCR = newSource.eContainmentFeature() != null ? newSource.eContainmentFeature().getName() : "";
+                    String _tgtCR = tgtObj.eContainmentFeature() != null ? tgtObj.eContainmentFeature().getName() : "";
+                    CorrespondenceModel.addEntry(corrResource,
+                            newSource, newSource.eClass().getName(), srcFp,
+                            tgtObj, tgtObj.eClass().getName(), tgtFp, _srcCR, _tgtCR);
+                    corrIndex.put(newSource, tgtObj);
+                    _createdBack.add(newSource);
+                }
+            } else {
+                // Known: check containment role and target fingerprint for changes
+                EObject srcObj = corrIndex.inverse().get(tgtObj);
+                if (srcObj != null) {
+                    Optional<EObject> entryOpt = CorrespondenceModel.findBySource(corrResource, srcObj);
+                    if (entryOpt.isPresent()) {
+                        String _currentTgtRole = tgtObj.eContainmentFeature() != null ? tgtObj.eContainmentFeature().getName() : "";
+                        String _storedTgtRole  = CorrespondenceModel.getTargetContainmentRole(entryOpt.get());
+                        if (_storedTgtRole == null) _storedTgtRole = "";
+                        if (!_currentTgtRole.equals(_storedTgtRole)) {
+                            // Target containment role changed for a TypeMapping object.
+                            // Update stored role; for role-based types this is handled in Phase 1b.
+                            CorrespondenceModel.updateTargetContainmentRole(entryOpt.get(), _currentTgtRole);
+                        }
+                        String storedFp = CorrespondenceModel.getTargetFingerprint(entryOpt.get());
+                        String currentFp = computeFingerprintBack(tgtObj);
+                        if (storedFp == null || storedFp.isEmpty() || !currentFp.equals(storedFp)) {
+                            // Apply backward attribute mappings for this type
+                            updateSourceAttributes(tgtObj, srcObj, options);
+                            // Only commit the fingerprint for TypeMapping types.
+                            // Role-based types: Phase 1b commits the fingerprint after structural updates.
+                            if (isCoveredByTypeMappingTarget(tgtObj)) {
+                                CorrespondenceModel.updateTargetFingerprint(entryOpt.get(), currentFp);
+                                _updatedBack.add(srcObj);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Phase 2: Detect and handle deleted target objects
+        // EMF nullifies CE_TARGET_OBJECT when the object is deleted from the resource,
+        // so we scan for entries with null targetObject rather than comparing allTargetObjects with corrIndex.
+        List<EObject> _deletedBwdEntries = new ArrayList<>(CorrespondenceModel.findDeletedTargetEntries(corrResource));
+        // Notify post-processor before actual deletion (CASCADE only)
+        if (ctx.getDeletionPolicy() == TransformationContext.DeletionPolicy.CASCADE) {
+            List<EObject> _toDeleteBack = new ArrayList<>();
+            for (EObject _corrEntry : _deletedBwdEntries) {
+                EObject srcObj = CorrespondenceModel.getSourceObject(_corrEntry);
+                if (srcObj != null) _toDeleteBack.add(srcObj);
+            }
+            postProcessor.beforeDeletions(_toDeleteBack);
+        }
+        for (EObject _corrEntry : _deletedBwdEntries) {
+            EObject srcObj = CorrespondenceModel.getSourceObject(_corrEntry);
+            switch (ctx.getDeletionPolicy()) {
+                case CASCADE -> {
+                    if (srcObj != null) {
+                        EcoreUtil.delete(srcObj, true);
+                    }
+                    CorrespondenceModel.removeCorrespondenceEntry(corrResource, _corrEntry);
+                }
+                case ORPHAN -> CorrespondenceModel.removeCorrespondenceEntry(corrResource, _corrEntry);
+                case TOMBSTONE -> CorrespondenceModel.markOrphaned(_corrEntry);
+            }
+        }
+
+        // Phase 3: Resolve cross-references incrementally (backward direction).
+        resolveReferencesIncrementalBack(targetModel, sourceModel, corrIndex);
+
+        CorrespondenceModel.saveAndUpdateTimestamp(corrResource);
+
+        postProcessor.afterTransform(targetModel, sourceModel, corrIndex.inverse(), _createdBack, _updatedBack);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -182,12 +652,30 @@ public class Pdb12Pdb2Transformation {
         if (target != null) {
 
             // Recursively transform containment references
+            // Cardinality (isMany) is resolved at runtime via EMF feature metadata,
+            // avoiding reliance on potentially incorrect LLM-provided sourceIsMany/targetIsMany flags.
             // Containment: Database.persons → Database.persons
             if (source instanceof pdb1.Database && target instanceof pdb2.Database) {
-                for (pdb1.Person child : ((pdb1.Database) source).getPersons()) {
-                    EObject transformedChild = createAndMapObjects(child, objectMap, visited, options);
-                    if (transformedChild instanceof pdb2.Person) {
-                        ((pdb2.Database) target).getPersons().add((pdb2.Person) transformedChild);
+                org.eclipse.emf.ecore.EStructuralFeature _srcFeat = source.eClass().getEStructuralFeature("persons");
+                org.eclipse.emf.ecore.EStructuralFeature _tgtFeat = target.eClass().getEStructuralFeature("persons");
+                if (_srcFeat != null && _tgtFeat != null) {
+                    @SuppressWarnings("unchecked")
+                    java.util.List<EObject> _srcItems = _srcFeat.isMany()
+                        ? (EList<EObject>) source.eGet(_srcFeat)
+                        : (source.eGet(_srcFeat) != null ? java.util.List.of((EObject) source.eGet(_srcFeat)) : java.util.List.of());
+                    for (EObject _rawChild : _srcItems) {
+                        if (_rawChild instanceof pdb1.Person child) {
+                            EObject transformedChild = createAndMapObjects(child, objectMap, visited, options);
+                            if (transformedChild instanceof pdb2.Person) {
+                                if (_tgtFeat.isMany()) {
+                                    @SuppressWarnings("unchecked")
+                                    EList<EObject> _tgtList = (EList<EObject>) target.eGet(_tgtFeat);
+                                    _tgtList.add(transformedChild);
+                                } else {
+                                    target.eSet(_tgtFeat, transformedChild);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -203,6 +691,7 @@ public class Pdb12Pdb2Transformation {
     /**
      * Resolves all cross-references (non-containment) using the object map.
      */
+    @SuppressWarnings("unchecked")
     private static void resolveReferences(Map<EObject, EObject> objectMap) {
         // No cross-references defined
     }
@@ -252,12 +741,29 @@ public class Pdb12Pdb2Transformation {
         if (source != null) {
 
             // Recursively transform containment references
+            // Cardinality resolved at runtime via EMF feature metadata.
             // Containment (backward): Database.persons → Database.persons
             if (target instanceof pdb2.Database && source instanceof pdb1.Database) {
-                for (pdb2.Person child : ((pdb2.Database) target).getPersons()) {
-                    EObject transformedChild = createAndMapObjectsBack(child, objectMap, visited, options);
-                    if (transformedChild instanceof pdb1.Person) {
-                        ((pdb1.Database) source).getPersons().add((pdb1.Person) transformedChild);
+                org.eclipse.emf.ecore.EStructuralFeature _tgtFeat = target.eClass().getEStructuralFeature("persons");
+                org.eclipse.emf.ecore.EStructuralFeature _srcFeat = source.eClass().getEStructuralFeature("persons");
+                if (_tgtFeat != null && _srcFeat != null) {
+                    @SuppressWarnings("unchecked")
+                    java.util.List<EObject> _tgtItems = _tgtFeat.isMany()
+                        ? (EList<EObject>) target.eGet(_tgtFeat)
+                        : (target.eGet(_tgtFeat) != null ? java.util.List.of((EObject) target.eGet(_tgtFeat)) : java.util.List.of());
+                    for (EObject _rawChild : _tgtItems) {
+                        if (_rawChild instanceof pdb2.Person child) {
+                            EObject transformedChild = createAndMapObjectsBack(child, objectMap, visited, options);
+                            if (transformedChild instanceof pdb1.Person) {
+                                if (_srcFeat.isMany()) {
+                                    @SuppressWarnings("unchecked")
+                                    EList<EObject> _srcList = (EList<EObject>) source.eGet(_srcFeat);
+                                    _srcList.add(transformedChild);
+                                } else {
+                                    source.eSet(_srcFeat, transformedChild);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -273,30 +779,40 @@ public class Pdb12Pdb2Transformation {
     /**
      * Resolves all cross-references (non-containment) using the object map.
      */
+    @SuppressWarnings("unchecked")
     private static void resolveReferencesBack(Map<EObject, EObject> objectMap) {
         // No cross-references defined
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // Single-Object Transformation Methods (kept for backwards compatibility)
+    // Phase 3: Incremental Cross-Reference Resolution
     // ════════════════════════════════════════════════════════════════════════
 
     /**
-     * Transforms a single Database object.
-     * @deprecated Use transform(Resource, Resource) for full model transformation.
+     * Resolves all cross-references (non-containment) incrementally.
+     * Uses corrIndex as lookup (not objectMap which doesn't exist in incremental mode).
+     * Iterates ALL source objects — cross-reference changes are not captured by fingerprint.
+     * For isMany references: clears the target list before refilling.
      */
-    @Deprecated
-    public static pdb2.Database transform(pdb1.Database source) {
-        return transformDatabase(source, Options.defaults());
+    @SuppressWarnings("unchecked")
+    private static void resolveReferencesIncremental(
+            Resource sourceModel,
+            Resource existingTarget,
+            com.google.common.collect.BiMap<EObject, EObject> corrIndex) {
+        // No cross-references defined
     }
 
     /**
-     * Transforms a single Database object back.
-     * @deprecated Use transformBack(Resource, Resource) for full model transformation.
+     * Resolves all cross-references (non-containment) incrementally in the backward direction.
+     * Uses corrIndex.inverse() as lookup.
+     * For isMany references: clears the source list before refilling.
      */
-    @Deprecated
-    public static pdb1.Database transformBack(pdb2.Database target) {
-        return transformBackDatabase(target, Options.defaults());
+    @SuppressWarnings("unchecked")
+    private static void resolveReferencesIncrementalBack(
+            Resource targetModel,
+            Resource sourceModel,
+            com.google.common.collect.BiMap<EObject, EObject> corrIndex) {
+        // No cross-references defined
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -364,9 +880,570 @@ public class Pdb12Pdb2Transformation {
         source.setPlaceOfBirth(target.getPlaceOfBirth());
         source.setId(target.getId());
         source.setIncrementalID(target.getIncrementalID());
-        source.setFirstName(options.nameBackwardSplitStrategy().equals("first") ? target.getName().contains(" ") ? target.getName().substring(0, target.getName().indexOf(' ')) : target.getName() : target.getName().contains(" ") ? target.getName().substring(0, target.getName().lastIndexOf(' ')) : target.getName());
-        source.setLastName(options.nameBackwardSplitStrategy().equals("first") ? target.getName().contains(" ") ? target.getName().substring(target.getName().indexOf(' ') + 1) : "" : target.getName().contains(" ") ? target.getName().substring(target.getName().lastIndexOf(' ') + 1) : "");
+        source.setFirstName(target.getName().contains(" ") ? target.getName().substring(0, "last".equals(options.nameBackwardSplitStrategy()) ? target.getName().lastIndexOf(' ') : target.getName().indexOf(' ')) : target.getName());
+        source.setLastName(target.getName().contains(" ") ? target.getName().substring(("last".equals(options.nameBackwardSplitStrategy()) ? target.getName().lastIndexOf(' ') : target.getName().indexOf(' ')) + 1) : "");
         return source;
     }
 
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Incremental Helper Methods
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Computes a fingerprint string for an EObject.
+     * Uses sourceKeyAttributes from the TypeMapping when available; falls back to all attributes.
+     */
+    private static String computeFingerprint(EObject obj) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(obj.eClass().getName()).append(":");
+        if (obj instanceof pdb1.Database typed) {
+            sb.append(typed.getName()).append("|");
+            return sb.toString();
+        }
+        if (obj instanceof pdb1.Person typed) {
+            sb.append(typed.getId()).append("|");
+            return sb.toString();
+        }
+        // Generic fallback: all attributes reflectively
+        for (EAttribute ea : obj.eClass().getEAllAttributes()) {
+            sb.append(obj.eGet(ea)).append("|");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Finds an EObject in a resource by identifier (XMI-ID first, then URI fragment).
+     */
+    private static EObject findInModel(Resource resource, String identifier) {
+        if (resource instanceof XMIResource xmi) {
+            EObject obj = xmi.getEObject(identifier);
+            if (obj != null) return obj;
+        }
+        try {
+            return resource.getEObject(identifier);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Returns all EObjects in a resource as a flat list. */
+    private static List<EObject> allSourceObjects(Resource resource) {
+        List<EObject> all = new ArrayList<>();
+        for (Iterator<EObject> it = resource.getAllContents(); it.hasNext(); ) {
+            all.add(it.next());
+        }
+        return all;
+    }
+
+    /** Creates a new target object for the given source EObject, or null if no mapping exists. */
+    private static EObject createNewTargetObject(EObject srcObj, Options options) {
+        if (srcObj instanceof pdb1.Database src) {
+            return transformDatabase(src, options);
+        }
+        if (srcObj instanceof pdb1.Person src) {
+            return transformPerson(src, options);
+        }
+        return null;
+    }
+
+    /**
+     * Returns true if the given source object is covered by a TypeMapping.
+     * Used to exclude role-based source types from Phase 1 of transformIncremental,
+     * so their change signal is preserved for mapRoleBasedTypesIncremental (Phase 1b).
+     */
+    private static boolean isCoveredByTypeMappingSource(EObject srcObj) {
+        if (srcObj instanceof pdb1.Database) return true;
+        if (srcObj instanceof pdb1.Person) return true;
+        return false;
+    }
+
+    /**
+     * Returns true if the given target object is covered by a TypeMapping.
+     * Used to exclude role-based target types from Phase 1 of transformIncrementalBack,
+     * so their change signal is preserved for mapRoleBasedTypesIncrementalBack (Phase 1b).
+     */
+    private static boolean isCoveredByTypeMappingTarget(EObject tgtObj) {
+        if (tgtObj instanceof pdb2.Database) return true;
+        if (tgtObj instanceof pdb2.Person) return true;
+        return false;
+    }
+
+    /** Updates the target object's attributes to reflect changes in the source object. */
+    private static void updateTargetAttributes(EObject srcObj, EObject tgtObj, Options options) {
+        if (srcObj instanceof pdb1.Database source
+                && tgtObj instanceof pdb2.Database target) {
+            target.setName(source.getName());
+        }
+        if (srcObj instanceof pdb1.Person source
+                && tgtObj instanceof pdb2.Person target) {
+            target.setBirthday(source.getBirthday());
+            target.setPlaceOfBirth(source.getPlaceOfBirth());
+            target.setId(source.getId());
+            target.setIncrementalID(source.getIncrementalID());
+            target.setName(source.getFirstName() + " " + source.getLastName());
+            target.setName(source.getFirstName() + " " + source.getLastName());
+        }
+    }
+
+    /**
+     * Adds a newly created target object to its correct containment in the target model.
+     * Uses the corrIndex to find the corresponding target parent.
+     */
+    private static void addToTargetContainment(
+            EObject srcObj, EObject newTarget,
+            Resource existingTarget,
+            com.google.common.collect.BiMap<EObject, EObject> corrIndex) {
+        EObject srcParent = srcObj.eContainer();
+        if (srcParent == null) {
+            existingTarget.getContents().add(newTarget);
+            return;
+        }
+        EObject targetParent = corrIndex.get(srcParent);
+        if (targetParent == null) return;
+
+        if (srcParent instanceof pdb1.Database
+                && newTarget instanceof pdb2.Person
+                && targetParent instanceof pdb2.Database) {
+            org.eclipse.emf.ecore.EStructuralFeature _tgtFeat = targetParent.eClass().getEStructuralFeature("persons");
+            if (_tgtFeat != null) {
+                if (_tgtFeat.isMany()) {
+                    @SuppressWarnings("unchecked")
+                    EList<EObject> _tgtList = (EList<EObject>) targetParent.eGet(_tgtFeat);
+                    _tgtList.add(newTarget);
+                } else {
+                    targetParent.eSet(_tgtFeat, newTarget);
+                }
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Backward Incremental Helper Methods
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Computes a fingerprint string for a target EObject (used for backward incremental detection).
+     * Uses targetKeyAttributes from TypeMapping/RoleBasedTypeMapping; falls back to all attributes.
+     */
+    private static String computeFingerprintBack(EObject obj) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(obj.eClass().getName()).append(":");
+        if (obj instanceof pdb2.Database typed) {
+            sb.append(typed.getName()).append("|");
+            return sb.toString();
+        }
+        if (obj instanceof pdb2.Person typed) {
+            sb.append(typed.getId()).append("|");
+            return sb.toString();
+        }
+        // Generic fallback: all attributes reflectively
+        for (EAttribute ea : obj.eClass().getEAllAttributes()) {
+            sb.append(obj.eGet(ea)).append("|");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Computes the expected target fingerprint for a source object as if it were transformed forward.
+     * Used in sync() for fuzzy matching: links existing unmatched objects instead of creating new ones.
+     * Returns null if no mapping applies.
+     */
+    private static String computeExpectedTargetFingerprint(EObject srcObj) {
+        // TypeMapping types: create a temporary target and compute its fingerprint.
+        EObject _tmp = createNewTargetObject(srcObj, Options.defaults());
+        if (_tmp != null) return computeFingerprintBack(_tmp);
+        return null;
+    }
+
+    /**
+     * Computes the expected source fingerprint for a target object as if it were transformed backward.
+     * Used in sync() for fuzzy matching: links existing unmatched objects instead of creating new ones.
+     * Returns null if no mapping applies.
+     */
+    private static String computeExpectedSourceFingerprint(EObject tgtObj) {
+        // TypeMapping types: create a temporary source and compute its fingerprint.
+        EObject _tmp = createNewSourceObject(tgtObj, Options.defaults());
+        if (_tmp != null) return computeFingerprint(_tmp);
+        return null;
+    }
+
+    /** Creates a new source object for the given target EObject, or null if no mapping exists. */
+    private static EObject createNewSourceObject(EObject tgtObj, Options options) {
+        if (tgtObj instanceof pdb2.Database tgt) {
+            return transformBackDatabase(tgt, options);
+        }
+        if (tgtObj instanceof pdb2.Person tgt) {
+            return transformBackPerson(tgt, options);
+        }
+        return null;
+    }
+
+    /**
+     * Updates the source object's attributes to reflect changes in the target object (backward).
+     * Handles both TypeMapping attribute expressions and role-based simple attribute updates.
+     * Structural changes (e.g. moving a FamilyMember to a different Family) are handled
+     * by mapRoleBasedTypesIncrementalBack after this method runs.
+     */
+    @SuppressWarnings("unchecked")
+    private static void updateSourceAttributes(EObject tgtObj, EObject srcObj, Options options) {
+        if (tgtObj instanceof pdb2.Database target
+                && srcObj instanceof pdb1.Database source) {
+            source.setName(target.getName());
+        }
+        if (tgtObj instanceof pdb2.Person target
+                && srcObj instanceof pdb1.Person source) {
+            source.setBirthday(target.getBirthday());
+            source.setPlaceOfBirth(target.getPlaceOfBirth());
+            source.setId(target.getId());
+            source.setIncrementalID(target.getIncrementalID());
+            source.setFirstName(target.getName().contains(" ") ? target.getName().substring(0, "last".equals(options.nameBackwardSplitStrategy()) ? target.getName().lastIndexOf(' ') : target.getName().indexOf(' ')) : target.getName());
+            source.setLastName(target.getName().contains(" ") ? target.getName().substring(("last".equals(options.nameBackwardSplitStrategy()) ? target.getName().lastIndexOf(' ') : target.getName().indexOf(' ')) + 1) : "");
+        }
+    }
+
+    /**
+     * Adds a newly created source object to its correct containment in the source model.
+     * Uses corrIndex.inverse() to find the corresponding source parent from the target parent.
+     */
+    private static void addToSourceContainment(
+            EObject tgtObj, EObject newSource,
+            Resource existingSource,
+            com.google.common.collect.BiMap<EObject, EObject> corrIndex) {
+        EObject tgtParent = tgtObj.eContainer();
+        if (tgtParent == null) {
+            existingSource.getContents().add(newSource);
+            return;
+        }
+        EObject srcParent = corrIndex.inverse().get(tgtParent);
+        if (srcParent == null) return;
+
+        if (tgtParent instanceof pdb2.Database
+                && newSource instanceof pdb1.Person
+                && srcParent instanceof pdb1.Database) {
+            org.eclipse.emf.ecore.EStructuralFeature _srcFeat = srcParent.eClass().getEStructuralFeature("persons");
+            if (_srcFeat != null) {
+                if (_srcFeat.isMany()) {
+                    @SuppressWarnings("unchecked")
+                    EList<EObject> _srcList = (EList<EObject>) srcParent.eGet(_srcFeat);
+                    _srcList.add(newSource);
+                } else {
+                    srcParent.eSet(_srcFeat, newSource);
+                }
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Single-Object Transformation Methods (kept for backwards compatibility)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Transforms a single Database object.
+     * @deprecated Use transform(Resource, Resource) for full model transformation.
+     */
+    @Deprecated
+    public static pdb2.Database transform(pdb1.Database source) {
+        return transformDatabase(source, Options.defaults());
+    }
+
+    /**
+     * Transforms a single Database object back.
+     * @deprecated Use transformBack(Resource, Resource) for full model transformation.
+     */
+    @Deprecated
+    public static pdb1.Database transformBack(pdb2.Database target) {
+        return transformBackDatabase(target, Options.defaults());
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Synchronisation: sync() — both models changed independently
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * BEKANNTER RANDFALL – Delete-Recreate mit gleichem Fingerprint:
+     *
+     * Wenn ein Objekt gelöscht und ein neues Objekt mit identischem
+     * Fingerprint (gleiche Schlüsselattribute) angelegt wird, hat das
+     * neue Objekt keinen Korrespondenzeintrag. Es wird daher in
+     * Schritt 5 als "neu" behandelt und erneut transformiert, obwohl
+     * es konzeptuell ein Update des gelöschten Objekts sein könnte.
+     *
+     * Konsequenz: Im Zielmodell entsteht ein neues Objekt, während
+     * das alte Zielobjekt über den verwaisten corrEntry (Partition 4)
+     * gelöscht wird. Das Ergebnis ist funktional korrekt, aber
+     * Querverweise anderer Objekte auf das alte Zielobjekt gehen
+     * verloren (sie zeigen nach dem Sync ins Leere, bis Phase 6
+     * Cross-References neu auflöst).
+     *
+     * Lösungsansatz für spätere Ausbaustufen: Persistente Objekt-IDs
+     * (XMI-IDs) statt Fingerprinting als primäre Identifikation.
+     * Dann ist Delete-Recreate eindeutig vom echten Neuanlegen
+     * unterscheidbar.
+     *
+     * Siehe auch: PROJECT_OVERVIEW.md, Bekannte Einschränkungen Nr. 2
+     */
+    public static SyncResult sync(Resource source, Resource target, Resource corrModel) {
+        return sync(source, target, corrModel,
+                SyncConflictPolicy.SOURCE_WINS,
+                TransformationContext.DeletionPolicy.TOMBSTONE,
+                Options.defaults(),
+                PostProcessor.NOOP, PostProcessor.NOOP);
+    }
+
+    public static SyncResult sync(
+            Resource source,
+            Resource target,
+            Resource corrModel,
+            SyncConflictPolicy conflictPolicy,
+            TransformationContext.DeletionPolicy deletionPolicy,
+            Options options) {
+        return sync(source, target, corrModel, conflictPolicy, deletionPolicy, options,
+                PostProcessor.NOOP, PostProcessor.NOOP);
+    }
+
+    /**
+     * Synchronises source and target using separate post-processors per direction.
+     * forwardPostProcessor.afterTransform is called with newly created/updated target objects.
+     * backwardPostProcessor.afterTransform is called with newly created/updated source objects.
+     * Note: beforeDeletions is not invoked by sync() — objects are deleted externally
+     * before sync() is called; their absence is detected via null corrEntry references.
+     */
+    @SuppressWarnings("unchecked")
+    public static SyncResult sync(
+            Resource source,
+            Resource target,
+            Resource corrModel,
+            SyncConflictPolicy conflictPolicy,
+            TransformationContext.DeletionPolicy deletionPolicy,
+            Options options,
+            PostProcessor forwardPostProcessor,
+            PostProcessor backwardPostProcessor) {
+
+        com.google.common.collect.BiMap<EObject, EObject> corrIndex = CorrespondenceModel.buildIndex(corrModel);
+        int _updFwd = 0, _updBwd = 0, _crFwd = 0, _crBwd = 0, _del = 0, _linked = 0;
+        java.util.List<SyncConflict> _conflicts = new java.util.ArrayList<>();
+        java.util.List<EObject> _fwdCreated = new java.util.ArrayList<>();
+        java.util.List<EObject> _fwdUpdated = new java.util.ArrayList<>();
+        java.util.List<EObject> _bwdCreated = new java.util.ArrayList<>();
+        java.util.List<EObject> _bwdUpdated = new java.util.ArrayList<>();
+
+        // Snapshot to avoid ConcurrentModificationException while removing Partition 4 entries.
+        java.util.List<EObject> _allEntries = CorrespondenceModel.getAllEntries(corrModel);
+
+        // ── Schritt 1: Partition 1 (src ≠ null, tgt ≠ null) ─────────────────
+        for (EObject _ce : _allEntries) {
+            EObject _srcObj = CorrespondenceModel.getSourceObject(_ce);
+            EObject _tgtObj = CorrespondenceModel.getTargetObject(_ce);
+            if (_srcObj == null || _tgtObj == null) continue;
+
+            String _storedSrcFp = CorrespondenceModel.getFingerprint(_ce);
+            String _storedTgtFp = CorrespondenceModel.getTargetFingerprint(_ce);
+            if (_storedSrcFp == null) _storedSrcFp = "";
+            if (_storedTgtFp == null) _storedTgtFp = "";
+
+            String _curSrcFp = computeFingerprint(_srcObj);
+            String _curTgtFp = computeFingerprintBack(_tgtObj);
+            boolean _srcChg = !_curSrcFp.equals(_storedSrcFp);
+            boolean _tgtChg = !_curTgtFp.equals(_storedTgtFp);
+
+            if (!_srcChg && !_tgtChg) continue; // Fall D: nothing to do
+
+            if (!isCoveredByTypeMappingSource(_srcObj)) {
+                // Role-based type: steer mapRoleBasedTypesIncremental/Back via fingerprint neutralisation.
+                if (_srcChg && _tgtChg) {
+                    switch (conflictPolicy) {
+                        case SOURCE_WINS ->
+                            // Neutralise backward: stored tgtFp ← current tgtFp
+                            CorrespondenceModel.updateTargetFingerprint(_ce, _curTgtFp);
+                        case TARGET_WINS ->
+                            // Neutralise forward: stored srcFp ← current srcFp
+                            CorrespondenceModel.updateFingerprint(_ce, _curSrcFp);
+                        case LOG_AND_SKIP -> {
+                            CorrespondenceModel.updateFingerprint(_ce, _curSrcFp);
+                            CorrespondenceModel.updateTargetFingerprint(_ce, _curTgtFp);
+                            _conflicts.add(new SyncConflict(_srcObj, _tgtObj,
+                                    _srcObj.eClass().getName(), _tgtObj.eClass().getName(),
+                                    _storedSrcFp, _curSrcFp, _storedTgtFp, _curTgtFp));
+                        }
+                    }
+                }
+                // Falls A and B are handled naturally by mapRoleBasedTypesIncremental/Back.
+                continue;
+            }
+
+            // TypeMapping type: handle inline.
+            if (_srcChg && !_tgtChg) {
+                // Fall A: source changed → forward propagate
+                updateTargetAttributes(_srcObj, _tgtObj, options);
+                CorrespondenceModel.updateFingerprint(_ce, _curSrcFp);
+                CorrespondenceModel.updateTargetFingerprint(_ce, computeFingerprintBack(_tgtObj));
+                _updFwd++; _fwdUpdated.add(_tgtObj);
+            } else if (!_srcChg && _tgtChg) {
+                // Fall B: target changed → backward propagate
+                updateSourceAttributes(_tgtObj, _srcObj, options);
+                CorrespondenceModel.updateTargetFingerprint(_ce, _curTgtFp);
+                CorrespondenceModel.updateFingerprint(_ce, computeFingerprint(_srcObj));
+                _updBwd++; _bwdUpdated.add(_srcObj);
+            } else {
+                // Fall C: conflict
+                switch (conflictPolicy) {
+                    case SOURCE_WINS -> {
+                        updateTargetAttributes(_srcObj, _tgtObj, options);
+                        CorrespondenceModel.updateFingerprint(_ce, _curSrcFp);
+                        CorrespondenceModel.updateTargetFingerprint(_ce, computeFingerprintBack(_tgtObj));
+                        _updFwd++; _fwdUpdated.add(_tgtObj);
+                    }
+                    case TARGET_WINS -> {
+                        updateSourceAttributes(_tgtObj, _srcObj, options);
+                        CorrespondenceModel.updateTargetFingerprint(_ce, _curTgtFp);
+                        CorrespondenceModel.updateFingerprint(_ce, computeFingerprint(_srcObj));
+                        _updBwd++; _bwdUpdated.add(_srcObj);
+                    }
+                    case LOG_AND_SKIP -> _conflicts.add(new SyncConflict(_srcObj, _tgtObj,
+                            _srcObj.eClass().getName(), _tgtObj.eClass().getName(),
+                            _storedSrcFp, _curSrcFp, _storedTgtFp, _curTgtFp));
+                }
+            }
+        }
+
+        // ── Schritt 2: Partition 2 (src ≠ null, tgt = null) — TypeMapping ──
+        for (EObject _ce : _allEntries) {
+            EObject _srcObj = CorrespondenceModel.getSourceObject(_ce);
+            if (_srcObj == null || CorrespondenceModel.getTargetObject(_ce) != null) continue;
+            if (!isCoveredByTypeMappingSource(_srcObj)) continue;
+            EObject _newTgt = createNewTargetObject(_srcObj, options);
+            if (_newTgt != null) {
+                addToTargetContainment(_srcObj, _newTgt, target, corrIndex);
+                String _tgtCR = _newTgt.eContainmentFeature() != null ? _newTgt.eContainmentFeature().getName() : "";
+                CorrespondenceModel.updateTargetObject(_ce, _newTgt, _newTgt.eClass().getName());
+                CorrespondenceModel.updateTargetFingerprint(_ce, computeFingerprintBack(_newTgt));
+                CorrespondenceModel.updateTargetContainmentRole(_ce, _tgtCR);
+                corrIndex.put(_srcObj, _newTgt);
+                _crFwd++; _fwdCreated.add(_newTgt);
+            }
+        }
+
+        // ── Schritt 3: Partition 3 (src = null, tgt ≠ null) — TypeMapping ──
+        for (EObject _ce : _allEntries) {
+            EObject _tgtObj = CorrespondenceModel.getTargetObject(_ce);
+            if (_tgtObj == null || CorrespondenceModel.getSourceObject(_ce) != null) continue;
+            if (!isCoveredByTypeMappingTarget(_tgtObj)) continue;
+            EObject _newSrc = createNewSourceObject(_tgtObj, options);
+            if (_newSrc != null) {
+                addToSourceContainment(_tgtObj, _newSrc, source, corrIndex);
+                String _srcCR = _newSrc.eContainmentFeature() != null ? _newSrc.eContainmentFeature().getName() : "";
+                CorrespondenceModel.updateSourceObject(_ce, _newSrc, _newSrc.eClass().getName());
+                CorrespondenceModel.updateFingerprint(_ce, computeFingerprint(_newSrc));
+                CorrespondenceModel.updateSourceContainmentRole(_ce, _srcCR);
+                corrIndex.put(_newSrc, _tgtObj);
+                _crBwd++; _bwdCreated.add(_newSrc);
+            }
+        }
+
+        // ── Schritt 4: Partition 4 (both null) ───────────────────────────────
+        for (EObject _ce : _allEntries) {
+            if (CorrespondenceModel.getSourceObject(_ce) == null
+                    && CorrespondenceModel.getTargetObject(_ce) == null) {
+                CorrespondenceModel.removeCorrespondenceEntry(corrModel, _ce);
+                _del++;
+            }
+        }
+
+        // ── Schritt 5a: Fuzzy-Match ──────────────────────────────────────────
+        // Versuche, ungematchte Objekte beider Seiten durch Fingerprint-Vergleich
+        // zu verbinden, bevor neue Objekte erstellt werden.
+        // Vorwärts: Index ungematchter Zielobjekte nach Backward-Fingerprint.
+        {
+            java.util.Map<String, EObject> _unmatchedTgtByFP = new java.util.HashMap<>();
+            for (EObject _obj : allSourceObjects(target)) {
+                if (!corrIndex.containsValue(_obj)) {
+                    String _fp = computeFingerprintBack(_obj);
+                    if (_fp != null) _unmatchedTgtByFP.putIfAbsent(_fp, _obj);
+                }
+            }
+            for (EObject _srcObj : allSourceObjects(source)) {
+                if (corrIndex.containsKey(_srcObj)) continue;
+                String _eFP = computeExpectedTargetFingerprint(_srcObj);
+                if (_eFP != null && _unmatchedTgtByFP.containsKey(_eFP)) {
+                    EObject _tgtObj = _unmatchedTgtByFP.remove(_eFP);
+                    String _srcCR = _srcObj.eContainmentFeature() != null ? _srcObj.eContainmentFeature().getName() : "";
+                    String _tgtCR = _tgtObj.eContainmentFeature() != null ? _tgtObj.eContainmentFeature().getName() : "";
+                    CorrespondenceModel.addEntry(corrModel,
+                            _srcObj, _srcObj.eClass().getName(), computeFingerprint(_srcObj),
+                            _tgtObj, _tgtObj.eClass().getName(), computeFingerprintBack(_tgtObj), _srcCR, _tgtCR);
+                    corrIndex.put(_srcObj, _tgtObj);
+                    _linked++;
+                }
+            }
+            // Rückwärts: Index ungematchter Quellobjekte nach Forward-Fingerprint.
+            java.util.Map<String, EObject> _unmatchedSrcByFP = new java.util.HashMap<>();
+            for (EObject _obj : allSourceObjects(source)) {
+                if (!corrIndex.containsKey(_obj)) {
+                    String _fp = computeFingerprint(_obj);
+                    if (_fp != null) _unmatchedSrcByFP.putIfAbsent(_fp, _obj);
+                }
+            }
+            for (EObject _tgtObj : allSourceObjects(target)) {
+                if (corrIndex.containsValue(_tgtObj)) continue;
+                String _eFP = computeExpectedSourceFingerprint(_tgtObj);
+                if (_eFP != null && _unmatchedSrcByFP.containsKey(_eFP)) {
+                    EObject _srcObj = _unmatchedSrcByFP.remove(_eFP);
+                    String _srcCR = _srcObj.eContainmentFeature() != null ? _srcObj.eContainmentFeature().getName() : "";
+                    String _tgtCR = _tgtObj.eContainmentFeature() != null ? _tgtObj.eContainmentFeature().getName() : "";
+                    CorrespondenceModel.addEntry(corrModel,
+                            _srcObj, _srcObj.eClass().getName(), computeFingerprint(_srcObj),
+                            _tgtObj, _tgtObj.eClass().getName(), computeFingerprintBack(_tgtObj), _srcCR, _tgtCR);
+                    corrIndex.put(_srcObj, _tgtObj);
+                    _linked++;
+                }
+            }
+        }
+
+        // ── Schritt 5: New objects without corrEntry — TypeMapping ───────────
+        for (EObject _srcObj : allSourceObjects(source)) {
+            if (!isCoveredByTypeMappingSource(_srcObj)) continue;
+            if (corrIndex.containsKey(_srcObj)) continue;
+            EObject _newTgt = createNewTargetObject(_srcObj, options);
+            if (_newTgt != null) {
+                addToTargetContainment(_srcObj, _newTgt, target, corrIndex);
+                String _srcCR = _srcObj.eContainmentFeature() != null ? _srcObj.eContainmentFeature().getName() : "";
+                String _tgtCR = _newTgt.eContainmentFeature() != null ? _newTgt.eContainmentFeature().getName() : "";
+                CorrespondenceModel.addEntry(corrModel,
+                        _srcObj, _srcObj.eClass().getName(), computeFingerprint(_srcObj),
+                        _newTgt, _newTgt.eClass().getName(), computeFingerprintBack(_newTgt), _srcCR, _tgtCR);
+                corrIndex.put(_srcObj, _newTgt);
+                _crFwd++; _fwdCreated.add(_newTgt);
+            }
+        }
+        for (EObject _tgtObj : allSourceObjects(target)) {
+            if (!isCoveredByTypeMappingTarget(_tgtObj)) continue;
+            if (corrIndex.inverse().containsKey(_tgtObj)) continue;
+            EObject _newSrc = createNewSourceObject(_tgtObj, options);
+            if (_newSrc != null) {
+                addToSourceContainment(_tgtObj, _newSrc, source, corrIndex);
+                String _srcCR = _newSrc.eContainmentFeature() != null ? _newSrc.eContainmentFeature().getName() : "";
+                String _tgtCR = _tgtObj.eContainmentFeature() != null ? _tgtObj.eContainmentFeature().getName() : "";
+                CorrespondenceModel.addEntry(corrModel,
+                        _newSrc, _newSrc.eClass().getName(), computeFingerprint(_newSrc),
+                        _tgtObj, _tgtObj.eClass().getName(), computeFingerprintBack(_tgtObj), _srcCR, _tgtCR);
+                corrIndex.put(_newSrc, _tgtObj);
+                _crBwd++; _bwdCreated.add(_newSrc);
+            }
+        }
+
+
+        // ── Schritt 6: Cross-references ──────────────────────────────────────
+        // Rebuild corrIndex after all structural changes.
+        corrIndex = CorrespondenceModel.buildIndex(corrModel);
+
+        CorrespondenceModel.saveAndUpdateTimestamp(corrModel);
+
+        // Post-processing: rebuild corrIndex so hooks see final cross-reference state.
+        com.google.common.collect.BiMap<EObject, EObject> _finalIndex = CorrespondenceModel.buildIndex(corrModel);
+        forwardPostProcessor.afterTransform(source, target, _finalIndex, _fwdCreated, _fwdUpdated);
+        backwardPostProcessor.afterTransform(target, source, _finalIndex.inverse(), _bwdCreated, _bwdUpdated);
+
+        return new SyncResult(_updFwd, _updBwd, _crFwd, _crBwd, _del, _linked, _conflicts);
+    }
 }
