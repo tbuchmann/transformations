@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Gantt2cpm
+Bundle-SymbolicName: de.tbuchmann.bxagent.gantt2cpm
+Bundle-Version: 1.0.0.qualifier
+Require-Bundle: CPM;bundle-version="0.1.0",
+ Gantt;bundle-version="0.1.0"
+Automatic-Module-Name: de.tbuchmann.bxagent.gantt2cpm
+Bundle-RequiredExecutionEnvironment: JavaSE-21
