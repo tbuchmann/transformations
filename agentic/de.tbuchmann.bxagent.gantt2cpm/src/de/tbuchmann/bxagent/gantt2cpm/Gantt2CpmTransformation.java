@@ -330,7 +330,6 @@ public class Gantt2CpmTransformation {
             gantt.GanttDiagram source = (gantt.GanttDiagram) sourceRoots.get(i);
             cpm.CPMNetwork target = (cpm.CPMNetwork) targetRoots.get(i);
             target.setName(source.getName());
-            target.setIncrementalID(source.getIncrementalID());
             objectMap.put(source, target);
         }
 
@@ -380,6 +379,27 @@ public class Gantt2CpmTransformation {
         com.google.common.collect.BiMap<EObject, EObject> corrIndex = ctx.getCorrIndex();
         List<EObject> _created = new ArrayList<>();
         List<EObject> _updated = new ArrayList<>();
+
+        // Bootstrap: ensure root element pairs are in the corr model before Phase 1.
+        // Without this, root elements (eContainer == null) would be treated as new objects
+        // on the first incremental call and a duplicate root would be added to the target resource.
+        {
+            List<EObject> _sRoots = sourceModel.getContents();
+            List<EObject> _tRoots = existingTarget.getContents();
+            for (int _ri = 0; _ri < Math.min(_sRoots.size(), _tRoots.size()); _ri++) {
+                EObject _sRoot = _sRoots.get(_ri);
+                EObject _tRoot = _tRoots.get(_ri);
+                if (CorrespondenceModel.findBySource(corrResource, _sRoot).isEmpty()) {
+                    updateTargetAttributes(_sRoot, _tRoot, options);
+                    String _rfp  = computeFingerprint(_sRoot);
+                    String _rbfp = computeFingerprintBack(_tRoot);
+                    CorrespondenceModel.addEntry(corrResource,
+                            _sRoot, _sRoot.eClass().getName(), _rfp,
+                            _tRoot, _tRoot.eClass().getName(), _rbfp, "", "");
+                    corrIndex.put(_sRoot, _tRoot);
+                }
+            }
+        }
 
         // Phase 1: Regular typed objects (TypeMappings only).
         // Role-based source types (e.g. FamilyMember) are handled exclusively in Phase 1b
@@ -483,7 +503,6 @@ public class Gantt2CpmTransformation {
             cpm.CPMNetwork target = (cpm.CPMNetwork) targetRoots.get(i);
             gantt.GanttDiagram source = (gantt.GanttDiagram) sourceRoots.get(i);
             source.setName(target.getName());
-            source.setIncrementalID(target.getIncrementalID());
             objectMap.put(target, source);
         }
 
@@ -516,6 +535,25 @@ public class Gantt2CpmTransformation {
         com.google.common.collect.BiMap<EObject, EObject> corrIndex = ctx.getCorrIndex();
         List<EObject> _createdBack = new ArrayList<>();
         List<EObject> _updatedBack = new ArrayList<>();
+
+        // Bootstrap: ensure root element pairs are in the corr model before Phase 1.
+        {
+            List<EObject> _tRoots = targetModel.getContents();
+            List<EObject> _sRoots = sourceModel.getContents();
+            for (int _ri = 0; _ri < Math.min(_tRoots.size(), _sRoots.size()); _ri++) {
+                EObject _tRoot = _tRoots.get(_ri);
+                EObject _sRoot = _sRoots.get(_ri);
+                if (!corrIndex.inverse().containsKey(_tRoot)) {
+                    updateSourceAttributes(_tRoot, _sRoot, options);
+                    String _rfp  = computeFingerprint(_sRoot);
+                    String _rbfp = computeFingerprintBack(_tRoot);
+                    CorrespondenceModel.addEntry(corrResource,
+                            _sRoot, _sRoot.eClass().getName(), _rfp,
+                            _tRoot, _tRoot.eClass().getName(), _rbfp, "", "");
+                    corrIndex.put(_sRoot, _tRoot);
+                }
+            }
+        }
 
         // Phase 1: All typed objects — TypeMappings AND role-based target types.
         // For TypeMapping objects: update attributes + fingerprint here.
@@ -697,56 +735,7 @@ public class Gantt2CpmTransformation {
      */
     @SuppressWarnings("unchecked")
     private static void resolveReferences(Map<EObject, EObject> objectMap) {
-        // Cross-reference: Activity.outgoingDependencies → Activity.sourceEvent
-        for (Map.Entry<EObject, EObject> entry : objectMap.entrySet()) {
-            EObject source = entry.getKey();
-            EObject target = entry.getValue();
-            if (source instanceof gantt.Activity && target instanceof cpm.Activity) {
-                org.eclipse.emf.ecore.EStructuralFeature _srcFeat = source.eClass().getEStructuralFeature("outgoingDependencies");
-                org.eclipse.emf.ecore.EStructuralFeature _tgtFeat = target.eClass().getEStructuralFeature("sourceEvent");
-                if (_srcFeat != null && _tgtFeat != null) {
-                    java.util.List<EObject> _srcRefs = _srcFeat.isMany()
-                        ? (EList<EObject>) source.eGet(_srcFeat)
-                        : (source.eGet(_srcFeat) != null ? java.util.List.of((EObject) source.eGet(_srcFeat)) : java.util.List.of());
-                    for (EObject refSrc : _srcRefs) {
-                        EObject refTgt = objectMap.get(refSrc);
-                        if (refTgt instanceof cpm.Event) {
-                            if (_tgtFeat.isMany()) {
-                                ((EList<EObject>) target.eGet(_tgtFeat)).add(refTgt);
-                            } else {
-                                target.eSet(_tgtFeat, refTgt);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Cross-reference: Activity.incomingDependencies → Activity.targetEvent
-        for (Map.Entry<EObject, EObject> entry : objectMap.entrySet()) {
-            EObject source = entry.getKey();
-            EObject target = entry.getValue();
-            if (source instanceof gantt.Activity && target instanceof cpm.Activity) {
-                org.eclipse.emf.ecore.EStructuralFeature _srcFeat = source.eClass().getEStructuralFeature("incomingDependencies");
-                org.eclipse.emf.ecore.EStructuralFeature _tgtFeat = target.eClass().getEStructuralFeature("targetEvent");
-                if (_srcFeat != null && _tgtFeat != null) {
-                    java.util.List<EObject> _srcRefs = _srcFeat.isMany()
-                        ? (EList<EObject>) source.eGet(_srcFeat)
-                        : (source.eGet(_srcFeat) != null ? java.util.List.of((EObject) source.eGet(_srcFeat)) : java.util.List.of());
-                    for (EObject refSrc : _srcRefs) {
-                        EObject refTgt = objectMap.get(refSrc);
-                        if (refTgt instanceof cpm.Event) {
-                            if (_tgtFeat.isMany()) {
-                                ((EList<EObject>) target.eGet(_tgtFeat)).add(refTgt);
-                            } else {
-                                target.eSet(_tgtFeat, refTgt);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
+        // No cross-references defined
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -838,56 +827,7 @@ public class Gantt2CpmTransformation {
      */
     @SuppressWarnings("unchecked")
     private static void resolveReferencesBack(Map<EObject, EObject> objectMap) {
-        // Cross-reference (backward): Activity.sourceEvent → Activity.outgoingDependencies
-        for (Map.Entry<EObject, EObject> entry : objectMap.entrySet()) {
-            EObject target = entry.getKey();
-            EObject source = entry.getValue();
-            if (target instanceof cpm.Activity && source instanceof gantt.Activity) {
-                org.eclipse.emf.ecore.EStructuralFeature _tgtFeat = target.eClass().getEStructuralFeature("sourceEvent");
-                org.eclipse.emf.ecore.EStructuralFeature _srcFeat = source.eClass().getEStructuralFeature("outgoingDependencies");
-                if (_tgtFeat != null && _srcFeat != null) {
-                    java.util.List<EObject> _tgtRefs = _tgtFeat.isMany()
-                        ? (EList<EObject>) target.eGet(_tgtFeat)
-                        : (target.eGet(_tgtFeat) != null ? java.util.List.of((EObject) target.eGet(_tgtFeat)) : java.util.List.of());
-                    for (EObject refTgt : _tgtRefs) {
-                        EObject refSrc = objectMap.get(refTgt);
-                        if (refSrc instanceof gantt.Dependency) {
-                            if (_srcFeat.isMany()) {
-                                ((EList<EObject>) source.eGet(_srcFeat)).add(refSrc);
-                            } else {
-                                source.eSet(_srcFeat, refSrc);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Cross-reference (backward): Activity.targetEvent → Activity.incomingDependencies
-        for (Map.Entry<EObject, EObject> entry : objectMap.entrySet()) {
-            EObject target = entry.getKey();
-            EObject source = entry.getValue();
-            if (target instanceof cpm.Activity && source instanceof gantt.Activity) {
-                org.eclipse.emf.ecore.EStructuralFeature _tgtFeat = target.eClass().getEStructuralFeature("targetEvent");
-                org.eclipse.emf.ecore.EStructuralFeature _srcFeat = source.eClass().getEStructuralFeature("incomingDependencies");
-                if (_tgtFeat != null && _srcFeat != null) {
-                    java.util.List<EObject> _tgtRefs = _tgtFeat.isMany()
-                        ? (EList<EObject>) target.eGet(_tgtFeat)
-                        : (target.eGet(_tgtFeat) != null ? java.util.List.of((EObject) target.eGet(_tgtFeat)) : java.util.List.of());
-                    for (EObject refTgt : _tgtRefs) {
-                        EObject refSrc = objectMap.get(refTgt);
-                        if (refSrc instanceof gantt.Dependency) {
-                            if (_srcFeat.isMany()) {
-                                ((EList<EObject>) source.eGet(_srcFeat)).add(refSrc);
-                            } else {
-                                source.eSet(_srcFeat, refSrc);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
+        // No cross-references defined
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -905,44 +845,7 @@ public class Gantt2CpmTransformation {
             Resource sourceModel,
             Resource existingTarget,
             com.google.common.collect.BiMap<EObject, EObject> corrIndex) {
-        // Cross-reference (incremental): Activity.outgoingDependencies → Activity.sourceEvent
-        for (EObject srcObj : allSourceObjects(sourceModel)) {
-            if (!(srcObj instanceof gantt.Activity)) continue;
-            EObject tgtObj = corrIndex.get(srcObj);
-            if (tgtObj == null || !(tgtObj instanceof cpm.Activity)) continue;
-            org.eclipse.emf.ecore.EStructuralFeature _srcFeat = srcObj.eClass().getEStructuralFeature("outgoingDependencies");
-            org.eclipse.emf.ecore.EStructuralFeature _tgtFeat = tgtObj.eClass().getEStructuralFeature("sourceEvent");
-            if (_srcFeat == null || _tgtFeat == null) continue;
-            // isMany → clear and refill
-            EList<EObject> _tgtList = (EList<EObject>) tgtObj.eGet(_tgtFeat);
-            if (_tgtList != null) _tgtList.clear();
-            for (EObject refSrc : (EList<EObject>) srcObj.eGet(_srcFeat)) {
-                EObject refTgt = corrIndex.get(refSrc);
-                if (refTgt instanceof cpm.Event) {
-                    _tgtList.add(refTgt);
-                }
-            }
-        }
-
-        // Cross-reference (incremental): Activity.incomingDependencies → Activity.targetEvent
-        for (EObject srcObj : allSourceObjects(sourceModel)) {
-            if (!(srcObj instanceof gantt.Activity)) continue;
-            EObject tgtObj = corrIndex.get(srcObj);
-            if (tgtObj == null || !(tgtObj instanceof cpm.Activity)) continue;
-            org.eclipse.emf.ecore.EStructuralFeature _srcFeat = srcObj.eClass().getEStructuralFeature("incomingDependencies");
-            org.eclipse.emf.ecore.EStructuralFeature _tgtFeat = tgtObj.eClass().getEStructuralFeature("targetEvent");
-            if (_srcFeat == null || _tgtFeat == null) continue;
-            // isMany → clear and refill
-            EList<EObject> _tgtList = (EList<EObject>) tgtObj.eGet(_tgtFeat);
-            if (_tgtList != null)  _tgtList.clear();
-            for (EObject refSrc : (EList<EObject>) srcObj.eGet(_srcFeat)) {
-                EObject refTgt = corrIndex.get(refSrc);
-                if (refTgt instanceof cpm.Event) {
-                    _tgtList.add(refTgt);
-                }
-            }
-        }
-
+        // No cross-references defined
     }
 
     /**
@@ -955,46 +858,7 @@ public class Gantt2CpmTransformation {
             Resource targetModel,
             Resource sourceModel,
             com.google.common.collect.BiMap<EObject, EObject> corrIndex) {
-        // Cross-reference (incremental backward): Activity.sourceEvent → Activity.outgoingDependencies
-        for (EObject tgtObj : allSourceObjects(targetModel)) {
-            if (!(tgtObj instanceof cpm.Activity)) continue;
-            EObject srcObj = corrIndex.inverse().get(tgtObj);
-            if (srcObj == null || !(srcObj instanceof gantt.Activity)) continue;
-            org.eclipse.emf.ecore.EStructuralFeature _tgtFeat = tgtObj.eClass().getEStructuralFeature("sourceEvent");
-            org.eclipse.emf.ecore.EStructuralFeature _srcFeat = srcObj.eClass().getEStructuralFeature("outgoingDependencies");
-            if (_tgtFeat == null || _srcFeat == null) continue;
-            // !isMany → set directly (including null)
-            EObject refTgt = (EObject) tgtObj.eGet(_tgtFeat);
-            if (refTgt == null) {
-                srcObj.eSet(_srcFeat, null);
-            } else {
-                EObject refSrc = corrIndex.inverse().get(refTgt);
-                if (refSrc instanceof gantt.Dependency) {
-                    srcObj.eSet(_srcFeat, refSrc);
-                }
-            }
-        }
-
-        // Cross-reference (incremental backward): Activity.targetEvent → Activity.incomingDependencies
-        for (EObject tgtObj : allSourceObjects(targetModel)) {
-            if (!(tgtObj instanceof cpm.Activity)) continue;
-            EObject srcObj = corrIndex.inverse().get(tgtObj);
-            if (srcObj == null || !(srcObj instanceof gantt.Activity)) continue;
-            org.eclipse.emf.ecore.EStructuralFeature _tgtFeat = tgtObj.eClass().getEStructuralFeature("targetEvent");
-            org.eclipse.emf.ecore.EStructuralFeature _srcFeat = srcObj.eClass().getEStructuralFeature("incomingDependencies");
-            if (_tgtFeat == null || _srcFeat == null) continue;
-            // !isMany → set directly (including null)
-            EObject refTgt = (EObject) tgtObj.eGet(_tgtFeat);
-            if (refTgt == null) {
-                srcObj.eSet(_srcFeat, null);
-            } else {
-                EObject refSrc = corrIndex.inverse().get(refTgt);
-                if (refSrc instanceof gantt.Dependency) {
-                    srcObj.eSet(_srcFeat, refSrc);
-                }
-            }
-        }
-
+        // No cross-references defined
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1012,7 +876,6 @@ public class Gantt2CpmTransformation {
         cpm.CPMNetwork target = CpmFactory.eINSTANCE.createCPMNetwork();
 
         target.setName(source.getName());
-        target.setIncrementalID(source.getIncrementalID());
         return target;
     }
 
@@ -1027,7 +890,6 @@ public class Gantt2CpmTransformation {
         gantt.GanttDiagram source = GanttFactory.eINSTANCE.createGanttDiagram();
 
         source.setName(target.getName());
-        source.setIncrementalID(target.getIncrementalID());
         return source;
     }
 
@@ -1058,8 +920,6 @@ public class Gantt2CpmTransformation {
 
         source.setName(target.getName());
         source.setDuration(target.getDuration());
-//        source.set("");
-//        source.setOffset(target.getDuration());
         return source;
     }
 
@@ -1088,9 +948,6 @@ public class Gantt2CpmTransformation {
 
         gantt.Dependency source = GanttFactory.eINSTANCE.createDependency();
 
-//        source.setName(target.getName());
-//        source.setDuration(target.getDuration());
-//        source.set("");
         source.setOffset(target.getDuration());
         return source;
     }
@@ -1117,12 +974,14 @@ public class Gantt2CpmTransformation {
         }
         if (obj instanceof gantt.Dependency typed) {
             for (EAttribute ea : obj.eClass().getEAllAttributes()) {
+                if ("incrementalID".equals(ea.getName())) continue;
                 sb.append(obj.eGet(ea)).append("|");
             }
             return sb.toString();
         }
         // Generic fallback: all attributes reflectively
         for (EAttribute ea : obj.eClass().getEAllAttributes()) {
+            if ("incrementalID".equals(ea.getName())) continue;
             sb.append(obj.eGet(ea)).append("|");
         }
         return sb.toString();
@@ -1194,7 +1053,6 @@ public class Gantt2CpmTransformation {
         if (srcObj instanceof gantt.GanttDiagram source
                 && tgtObj instanceof cpm.CPMNetwork target) {
             target.setName(source.getName());
-            target.setIncrementalID(source.getIncrementalID());
         }
         if (srcObj instanceof gantt.Activity source
                 && tgtObj instanceof cpm.Activity target) {
@@ -1261,6 +1119,7 @@ public class Gantt2CpmTransformation {
         }
         // Generic fallback: all attributes reflectively
         for (EAttribute ea : obj.eClass().getEAllAttributes()) {
+            if ("incrementalID".equals(ea.getName())) continue;
             sb.append(obj.eGet(ea)).append("|");
         }
         return sb.toString();
@@ -1316,20 +1175,14 @@ public class Gantt2CpmTransformation {
         if (tgtObj instanceof cpm.CPMNetwork target
                 && srcObj instanceof gantt.GanttDiagram source) {
             source.setName(target.getName());
-            source.setIncrementalID(target.getIncrementalID());
         }
         if (tgtObj instanceof cpm.Activity target
                 && srcObj instanceof gantt.Activity source) {
             source.setName(target.getName());
             source.setDuration(target.getDuration());
-            //source.set("");
-            //source.setOffset(target.getDuration());
         }
         if (tgtObj instanceof cpm.Activity target
                 && srcObj instanceof gantt.Dependency source) {
-            //source.setName(target.getName());
-            //source.setDuration(target.getDuration());
-            //source.set("");
             source.setOffset(target.getDuration());
         }
     }
@@ -1668,10 +1521,6 @@ public class Gantt2CpmTransformation {
         // ── Schritt 6: Cross-references ──────────────────────────────────────
         // Rebuild corrIndex after all structural changes.
         corrIndex = CorrespondenceModel.buildIndex(corrModel);
-        switch (conflictPolicy) {
-            case SOURCE_WINS, LOG_AND_SKIP -> resolveReferencesIncremental(source, target, corrIndex);
-            case TARGET_WINS -> resolveReferencesIncrementalBack(target, source, corrIndex);
-        }
 
         CorrespondenceModel.saveAndUpdateTimestamp(corrModel);
 
