@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Ast2dag
+Bundle-SymbolicName: de.tbuchmann.bxagent.ast2dag
+Bundle-Version: 1.0.0.qualifier
+Require-Bundle: ExpressionAST;bundle-version="0.1.0",
+ ExpressionDAG;bundle-version="0.1.0"
+Automatic-Module-Name: de.tbuchmann.bxagent.ast2dag
+Bundle-RequiredExecutionEnvironment: JavaSE-21

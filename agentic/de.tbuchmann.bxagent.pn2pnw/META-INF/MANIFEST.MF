@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Pn2pnw
+Bundle-SymbolicName: de.tbuchmann.bxagent.pn2pnw
+Bundle-Version: 1.0.0.qualifier
+Require-Bundle: Petrinet;bundle-version="0.1.0",
+ PetrinetWeighted;bundle-version="0.1.0"
+Automatic-Module-Name: de.tbuchmann.bxagent.pn2pnw
+Bundle-RequiredExecutionEnvironment: JavaSE-21
