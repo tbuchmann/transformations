@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Ecore2sql
+Bundle-SymbolicName: de.tbuchmann.bxagent.ecore2sql
+Bundle-Version: 1.0.0.qualifier
+Require-Bundle: org.eclipse.emf.ecore;bundle-version="2.41.0",
+ SQL;bundle-version="0.1.0"
+Automatic-Module-Name: de.tbuchmann.bxagent.ecore2sql
+Bundle-RequiredExecutionEnvironment: JavaSE-21
