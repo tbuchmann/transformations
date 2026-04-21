@@ -948,26 +948,40 @@ public class Ecore2SqlTransformation {
                             CorrespondenceModel.updateTargetContainmentRole(_ctmExistingEntry.get(),
                                 _ctmTargetObj.eContainmentFeature() != null ? _ctmTargetObj.eContainmentFeature().getName() : "");
                         }
-                        String _ctmStoredFp = CorrespondenceModel.getFingerprint(_ctmExistingEntry.get());
-                        if (!_ctmFp.equals(_ctmStoredFp) && _ctmTargetObj != null) {
-                            // Update attributes for changed CTM object
-                            if (_ctmTargetObj instanceof sql.Table _ctmUpdTgt) {
-                                EClass source = _ctmSrc;
-                                EObject _ctmParentSrc = _ctmOwner;
-                                sql.Table target = _ctmUpdTgt;
-                                _ctmUpdTgt.setName(source.getName());
-                                target.setName(source.getName());
+                        // Check if source still matches any branch condition; delete orphaned target if not
+                        boolean _ctmConditionStillMatches = false;
+                        if (!_ctmConditionStillMatches && _ctmTargetObj instanceof sql.Table && (!_ctmSrc.isAbstract())) {
+                            _ctmConditionStillMatches = true;
+                        }
+                        if (!_ctmConditionStillMatches && _ctmTargetObj instanceof sql.Table && (_ctmSrc.isAbstract())) {
+                            _ctmConditionStillMatches = true;
+                        }
+                        if (!_ctmConditionStillMatches && _ctmTargetObj != null) {
+                            EcoreUtil.delete(_ctmTargetObj, true);
+                            corrIndex.remove((EObject) _ctmItem);
+                            CorrespondenceModel.removeCorrespondenceEntry(corrResource, _ctmExistingEntry.get());
+                        } else if (_ctmConditionStillMatches) {
+                            String _ctmStoredFp = CorrespondenceModel.getFingerprint(_ctmExistingEntry.get());
+                            if (!_ctmFp.equals(_ctmStoredFp) && _ctmTargetObj != null) {
+                                // Update attributes for changed CTM object
+                                if (_ctmTargetObj instanceof sql.Table _ctmUpdTgt) {
+                                    EClass source = _ctmSrc;
+                                    EObject _ctmParentSrc = _ctmOwner;
+                                    sql.Table target = _ctmUpdTgt;
+                                    _ctmUpdTgt.setName(source.getName());
+                                    target.setName(source.getName());
+                                }
+                                if (_ctmTargetObj instanceof sql.Table _ctmUpdTgt) {
+                                    EClass source = _ctmSrc;
+                                    EObject _ctmParentSrc = _ctmOwner;
+                                    sql.Table target = _ctmUpdTgt;
+                                    _ctmUpdTgt.setName(source.getName());
+                                    target.setName(source.getName());
+                                }
+                                CorrespondenceModel.updateFingerprint(_ctmExistingEntry.get(), _ctmFp);
+                                CorrespondenceModel.updateTargetFingerprint(_ctmExistingEntry.get(), computeFingerprintBack(_ctmTargetObj));
+                                _updated.add(_ctmTargetObj);
                             }
-                            if (_ctmTargetObj instanceof sql.Table _ctmUpdTgt) {
-                                EClass source = _ctmSrc;
-                                EObject _ctmParentSrc = _ctmOwner;
-                                sql.Table target = _ctmUpdTgt;
-                                _ctmUpdTgt.setName(source.getName());
-                                target.setName(source.getName());
-                            }
-                            CorrespondenceModel.updateFingerprint(_ctmExistingEntry.get(), _ctmFp);
-                            CorrespondenceModel.updateTargetFingerprint(_ctmExistingEntry.get(), computeFingerprintBack(_ctmTargetObj));
-                            _updated.add(_ctmTargetObj);
                         }
                     }
                 }
@@ -1117,26 +1131,40 @@ public class Ecore2SqlTransformation {
                             CorrespondenceModel.updateTargetContainmentRole(_ctmExistingEntry.get(),
                                 _ctmTargetObj.eContainmentFeature() != null ? _ctmTargetObj.eContainmentFeature().getName() : "");
                         }
-                        String _ctmStoredFp = CorrespondenceModel.getFingerprint(_ctmExistingEntry.get());
-                        if (!_ctmFp.equals(_ctmStoredFp) && _ctmTargetObj != null) {
-                            // Update attributes for changed CTM object
-                            if (_ctmTargetObj instanceof sql.Column _ctmUpdTgt) {
-                                EAttribute source = _ctmSrc;
-                                EObject _ctmParentSrc = _ctmOwner;
-                                sql.Column target = _ctmUpdTgt;
-                                _ctmUpdTgt.setName(source.getName());
-                                target.setName(source.getName());
-                                target.setType(source.getEType() != null ? source.getEType().getInstanceClassName() : "int");
+                        // Check if source still matches any branch condition; delete orphaned target if not
+                        boolean _ctmConditionStillMatches = false;
+                        if (!_ctmConditionStillMatches && _ctmTargetObj instanceof sql.Column && (_ctmSrc.getUpperBound() == 1)) {
+                            _ctmConditionStillMatches = true;
+                        }
+                        if (!_ctmConditionStillMatches && _ctmTargetObj instanceof sql.Table && (_ctmSrc.getUpperBound() != 1)) {
+                            _ctmConditionStillMatches = true;
+                        }
+                        if (!_ctmConditionStillMatches && _ctmTargetObj != null) {
+                            EcoreUtil.delete(_ctmTargetObj, true);
+                            corrIndex.remove((EObject) _ctmItem);
+                            CorrespondenceModel.removeCorrespondenceEntry(corrResource, _ctmExistingEntry.get());
+                        } else if (_ctmConditionStillMatches) {
+                            String _ctmStoredFp = CorrespondenceModel.getFingerprint(_ctmExistingEntry.get());
+                            if (!_ctmFp.equals(_ctmStoredFp) && _ctmTargetObj != null) {
+                                // Update attributes for changed CTM object
+                                if (_ctmTargetObj instanceof sql.Column _ctmUpdTgt) {
+                                    EAttribute source = _ctmSrc;
+                                    EObject _ctmParentSrc = _ctmOwner;
+                                    sql.Column target = _ctmUpdTgt;
+                                    _ctmUpdTgt.setName(source.getName());
+                                    target.setName(source.getName());
+                                    target.setType(source.getEType() != null ? source.getEType().getInstanceClassName() : "int");
+                                }
+                                if (_ctmTargetObj instanceof sql.Table _ctmUpdTgt) {
+                                    EAttribute source = _ctmSrc;
+                                    EObject _ctmParentSrc = _ctmOwner;
+                                    sql.Table target = _ctmUpdTgt;
+                                    _ctmUpdTgt.setName(((EClass) _ctmParentSrc).getName() + "_" + source.getName());
+                                }
+                                CorrespondenceModel.updateFingerprint(_ctmExistingEntry.get(), _ctmFp);
+                                CorrespondenceModel.updateTargetFingerprint(_ctmExistingEntry.get(), computeFingerprintBack(_ctmTargetObj));
+                                _updated.add(_ctmTargetObj);
                             }
-                            if (_ctmTargetObj instanceof sql.Table _ctmUpdTgt) {
-                                EAttribute source = _ctmSrc;
-                                EObject _ctmParentSrc = _ctmOwner;
-                                sql.Table target = _ctmUpdTgt;
-                                _ctmUpdTgt.setName(((EClass) _ctmParentSrc).getName() + "_" + source.getName());
-                            }
-                            CorrespondenceModel.updateFingerprint(_ctmExistingEntry.get(), _ctmFp);
-                            CorrespondenceModel.updateTargetFingerprint(_ctmExistingEntry.get(), computeFingerprintBack(_ctmTargetObj));
-                            _updated.add(_ctmTargetObj);
                         }
                     }
                 }
@@ -1242,19 +1270,30 @@ public class Ecore2SqlTransformation {
                             CorrespondenceModel.updateTargetContainmentRole(_ctmExistingEntry.get(),
                                 _ctmTargetObj.eContainmentFeature() != null ? _ctmTargetObj.eContainmentFeature().getName() : "");
                         }
-                        String _ctmStoredFp = CorrespondenceModel.getFingerprint(_ctmExistingEntry.get());
-                        if (!_ctmFp.equals(_ctmStoredFp) && _ctmTargetObj != null) {
-                            // Update attributes for changed CTM object
-                            if (_ctmTargetObj instanceof sql.Column _ctmUpdTgt) {
-                                EReference source = _ctmSrc;
-                                EObject _ctmParentSrc = _ctmOwner;
-                                sql.Column target = _ctmUpdTgt;
-                                _ctmUpdTgt.setName(source.getName());
-                                target.setType("int");
+                        // Check if source still matches any branch condition; delete orphaned target if not
+                        boolean _ctmConditionStillMatches = false;
+                        if (!_ctmConditionStillMatches && _ctmTargetObj instanceof sql.Column && (!_ctmSrc.isContainment() && _ctmSrc.getUpperBound() == 1 && _ctmSrc.getEOpposite() == null)) {
+                            _ctmConditionStillMatches = true;
+                        }
+                        if (!_ctmConditionStillMatches && _ctmTargetObj != null) {
+                            EcoreUtil.delete(_ctmTargetObj, true);
+                            corrIndex.remove((EObject) _ctmItem);
+                            CorrespondenceModel.removeCorrespondenceEntry(corrResource, _ctmExistingEntry.get());
+                        } else if (_ctmConditionStillMatches) {
+                            String _ctmStoredFp = CorrespondenceModel.getFingerprint(_ctmExistingEntry.get());
+                            if (!_ctmFp.equals(_ctmStoredFp) && _ctmTargetObj != null) {
+                                // Update attributes for changed CTM object
+                                if (_ctmTargetObj instanceof sql.Column _ctmUpdTgt) {
+                                    EReference source = _ctmSrc;
+                                    EObject _ctmParentSrc = _ctmOwner;
+                                    sql.Column target = _ctmUpdTgt;
+                                    _ctmUpdTgt.setName(source.getName());
+                                    target.setType("int");
+                                }
+                                CorrespondenceModel.updateFingerprint(_ctmExistingEntry.get(), _ctmFp);
+                                CorrespondenceModel.updateTargetFingerprint(_ctmExistingEntry.get(), computeFingerprintBack(_ctmTargetObj));
+                                _updated.add(_ctmTargetObj);
                             }
-                            CorrespondenceModel.updateFingerprint(_ctmExistingEntry.get(), _ctmFp);
-                            CorrespondenceModel.updateTargetFingerprint(_ctmExistingEntry.get(), computeFingerprintBack(_ctmTargetObj));
-                            _updated.add(_ctmTargetObj);
                         }
                     }
                 }
@@ -1754,6 +1793,27 @@ public class Ecore2SqlTransformation {
                                     }
                                 }
                             }
+                            // Check if source's parent container has changed; delete orphaned source if so
+                            EObject _ctmBwExpectedParent;
+                            _ctmBwExpectedParent = corrIndex.inverse().get(_ctmBwTgt.eContainer());
+                            if (_ctmBwExpectedParent != null && !_ctmBwExpectedParent.equals(_ctmBwKnownSrc.eContainer())) {
+                                // Parent changed — relocate source object to new parent
+                                EcoreUtil.remove(_ctmBwSrcObj);
+                                org.eclipse.emf.ecore.EStructuralFeature _ctmBwRelocFeat =
+                                    _ctmBwExpectedParent.eClass().getEStructuralFeature("eClassifiers");
+                                if (_ctmBwRelocFeat != null) {
+                                    if (_ctmBwRelocFeat.isMany()) {
+                                        @SuppressWarnings("unchecked")
+                                        java.util.List<EObject> _ctmBwRelocList =
+                                            (java.util.List<EObject>) _ctmBwExpectedParent.eGet(_ctmBwRelocFeat);
+                                        _ctmBwRelocList.add(_ctmBwSrcObj);
+                                    } else {
+                                        _ctmBwExpectedParent.eSet(_ctmBwRelocFeat, _ctmBwSrcObj);
+                                    }
+                                }
+                                CorrespondenceModel.updateSourceContainmentRole(_ctmBwEntry.get(),
+                                    _ctmBwSrcObj.eContainmentFeature() != null ? _ctmBwSrcObj.eContainmentFeature().getName() : "");
+                            }
                             String _ctmBwCurrFp = computeFingerprintBack(_ctmBwTgt);
                             String _ctmBwStoredFp = CorrespondenceModel.getTargetFingerprint(_ctmBwEntry.get());
                             if (_ctmBwStoredFp == null || _ctmBwStoredFp.isEmpty() || !_ctmBwCurrFp.equals(_ctmBwStoredFp)) {
@@ -1836,6 +1896,27 @@ public class Ecore2SqlTransformation {
                                     }
                                 }
                             }
+                            // Check if source's parent container has changed; delete orphaned source if so
+                            EObject _ctmBwExpectedParent;
+                            _ctmBwExpectedParent = corrIndex.inverse().get(_ctmBwTgt.eContainer());
+                            if (_ctmBwExpectedParent != null && !_ctmBwExpectedParent.equals(_ctmBwKnownSrc.eContainer())) {
+                                // Parent changed — relocate source object to new parent
+                                EcoreUtil.remove(_ctmBwSrcObj);
+                                org.eclipse.emf.ecore.EStructuralFeature _ctmBwRelocFeat =
+                                    _ctmBwExpectedParent.eClass().getEStructuralFeature("eClassifiers");
+                                if (_ctmBwRelocFeat != null) {
+                                    if (_ctmBwRelocFeat.isMany()) {
+                                        @SuppressWarnings("unchecked")
+                                        java.util.List<EObject> _ctmBwRelocList =
+                                            (java.util.List<EObject>) _ctmBwExpectedParent.eGet(_ctmBwRelocFeat);
+                                        _ctmBwRelocList.add(_ctmBwSrcObj);
+                                    } else {
+                                        _ctmBwExpectedParent.eSet(_ctmBwRelocFeat, _ctmBwSrcObj);
+                                    }
+                                }
+                                CorrespondenceModel.updateSourceContainmentRole(_ctmBwEntry.get(),
+                                    _ctmBwSrcObj.eContainmentFeature() != null ? _ctmBwSrcObj.eContainmentFeature().getName() : "");
+                            }
                             String _ctmBwCurrFp = computeFingerprintBack(_ctmBwTgt);
                             String _ctmBwStoredFp = CorrespondenceModel.getTargetFingerprint(_ctmBwEntry.get());
                             if (_ctmBwStoredFp == null || _ctmBwStoredFp.isEmpty() || !_ctmBwCurrFp.equals(_ctmBwStoredFp)) {
@@ -1917,6 +1998,27 @@ public class Ecore2SqlTransformation {
                                         }
                                     }
                                 }
+                            }
+                            // Check if source's parent container has changed; delete orphaned source if so
+                            EObject _ctmBwExpectedParent;
+                            _ctmBwExpectedParent = corrIndex.inverse().get(_ctmBwTgt.eContainer());
+                            if (_ctmBwExpectedParent != null && !_ctmBwExpectedParent.equals(_ctmBwKnownSrc.eContainer())) {
+                                // Parent changed — relocate source object to new parent
+                                EcoreUtil.remove(_ctmBwSrcObj);
+                                org.eclipse.emf.ecore.EStructuralFeature _ctmBwRelocFeat =
+                                    _ctmBwExpectedParent.eClass().getEStructuralFeature("eStructuralFeatures");
+                                if (_ctmBwRelocFeat != null) {
+                                    if (_ctmBwRelocFeat.isMany()) {
+                                        @SuppressWarnings("unchecked")
+                                        java.util.List<EObject> _ctmBwRelocList =
+                                            (java.util.List<EObject>) _ctmBwExpectedParent.eGet(_ctmBwRelocFeat);
+                                        _ctmBwRelocList.add(_ctmBwSrcObj);
+                                    } else {
+                                        _ctmBwExpectedParent.eSet(_ctmBwRelocFeat, _ctmBwSrcObj);
+                                    }
+                                }
+                                CorrespondenceModel.updateSourceContainmentRole(_ctmBwEntry.get(),
+                                    _ctmBwSrcObj.eContainmentFeature() != null ? _ctmBwSrcObj.eContainmentFeature().getName() : "");
                             }
                             String _ctmBwCurrFp = computeFingerprintBack(_ctmBwTgt);
                             String _ctmBwStoredFp = CorrespondenceModel.getTargetFingerprint(_ctmBwEntry.get());
@@ -2006,6 +2108,32 @@ public class Ecore2SqlTransformation {
                                     }
                                 }
                             }
+                            // Check if source's parent container has changed; delete orphaned source if so
+                            EObject _ctmBwExpectedParent;
+                            {
+                                EObject target = _ctmBwTgt;
+                                java.util.Map<EObject, EObject> objectMapInverse = new java.util.HashMap<>(corrIndex.inverse());
+                                Resource _ctmBwSrcRes = sourceModel;
+                                _ctmBwExpectedParent = (EObject)(((sql.Table) target).getOwnedForeignKeys().stream().filter(fk -> fk.getColumn() != null && "id".equals(fk.getColumn().getName()) && !_hasAnnotation(fk, "root") && !_hasAnnotation(fk, "superType")).findFirst().map(fk -> (EObject) objectMapInverse.get(fk.getReferencedTable())).orElse(null));
+                            }
+                            if (_ctmBwExpectedParent != null && !_ctmBwExpectedParent.equals(_ctmBwKnownSrc.eContainer())) {
+                                // Parent changed — relocate source object to new parent
+                                EcoreUtil.remove(_ctmBwSrcObj);
+                                org.eclipse.emf.ecore.EStructuralFeature _ctmBwRelocFeat =
+                                    _ctmBwExpectedParent.eClass().getEStructuralFeature("eStructuralFeatures");
+                                if (_ctmBwRelocFeat != null) {
+                                    if (_ctmBwRelocFeat.isMany()) {
+                                        @SuppressWarnings("unchecked")
+                                        java.util.List<EObject> _ctmBwRelocList =
+                                            (java.util.List<EObject>) _ctmBwExpectedParent.eGet(_ctmBwRelocFeat);
+                                        _ctmBwRelocList.add(_ctmBwSrcObj);
+                                    } else {
+                                        _ctmBwExpectedParent.eSet(_ctmBwRelocFeat, _ctmBwSrcObj);
+                                    }
+                                }
+                                CorrespondenceModel.updateSourceContainmentRole(_ctmBwEntry.get(),
+                                    _ctmBwSrcObj.eContainmentFeature() != null ? _ctmBwSrcObj.eContainmentFeature().getName() : "");
+                            }
                             String _ctmBwCurrFp = computeFingerprintBack(_ctmBwTgt);
                             String _ctmBwStoredFp = CorrespondenceModel.getTargetFingerprint(_ctmBwEntry.get());
                             if (_ctmBwStoredFp == null || _ctmBwStoredFp.isEmpty() || !_ctmBwCurrFp.equals(_ctmBwStoredFp)) {
@@ -2088,6 +2216,27 @@ public class Ecore2SqlTransformation {
                                         }
                                     }
                                 }
+                            }
+                            // Check if source's parent container has changed; delete orphaned source if so
+                            EObject _ctmBwExpectedParent;
+                            _ctmBwExpectedParent = corrIndex.inverse().get(_ctmBwTgt.eContainer());
+                            if (_ctmBwExpectedParent != null && !_ctmBwExpectedParent.equals(_ctmBwKnownSrc.eContainer())) {
+                                // Parent changed — relocate source object to new parent
+                                EcoreUtil.remove(_ctmBwSrcObj);
+                                org.eclipse.emf.ecore.EStructuralFeature _ctmBwRelocFeat =
+                                    _ctmBwExpectedParent.eClass().getEStructuralFeature("eStructuralFeatures");
+                                if (_ctmBwRelocFeat != null) {
+                                    if (_ctmBwRelocFeat.isMany()) {
+                                        @SuppressWarnings("unchecked")
+                                        java.util.List<EObject> _ctmBwRelocList =
+                                            (java.util.List<EObject>) _ctmBwExpectedParent.eGet(_ctmBwRelocFeat);
+                                        _ctmBwRelocList.add(_ctmBwSrcObj);
+                                    } else {
+                                        _ctmBwExpectedParent.eSet(_ctmBwRelocFeat, _ctmBwSrcObj);
+                                    }
+                                }
+                                CorrespondenceModel.updateSourceContainmentRole(_ctmBwEntry.get(),
+                                    _ctmBwSrcObj.eContainmentFeature() != null ? _ctmBwSrcObj.eContainmentFeature().getName() : "");
                             }
                             String _ctmBwCurrFp = computeFingerprintBack(_ctmBwTgt);
                             String _ctmBwStoredFp = CorrespondenceModel.getTargetFingerprint(_ctmBwEntry.get());
@@ -3174,6 +3323,35 @@ _maSqlTypeMap.put("java.lang.Boolean", "boolean");
                 }
             }
         }
+        // BIDIRECTIONAL_CROSS_REF backward incremental: remove stale EReference pairs no longer backed by TLM
+        {
+            java.util.Set<String> _bxrLiveNodeNames = new java.util.HashSet<>();
+            for (EObject _ln : allSourceObjects(targetModel)) {
+                if (_hasAnnotation(_ln, "bidirectional") && _hasAnnotation(_ln, "cross")) {
+                    String _lnn = _tlmGetStr(_ln, _bwTLM_NNAME_F);
+                    if (_lnn != null) _bxrLiveNodeNames.add(_lnn);
+                }
+            }
+            for (EObject _bxrStaleObj : allSourceObjects(sourceModel)) {
+                if (!(_bxrStaleObj instanceof EClass _bxrStaleEC)) continue;
+                for (org.eclipse.emf.ecore.EStructuralFeature _bxrStaleF : new java.util.ArrayList<>(_bxrStaleEC.getEStructuralFeatures())) {
+                    if (!(_bxrStaleF instanceof EReference _bxrStaleRef)) continue;
+                    if (_bxrStaleRef.isContainment()) continue;
+                    EReference _bxrStaleOpp = _bxrStaleRef.getEOpposite();
+                    if (_bxrStaleOpp == null) continue;
+                    if (_bxrStaleOpp.isContainment()) continue; // backward half of CONTAINMENT_MULTI_BIDIRECTIONAL, not BXRF
+                    if (_bxrStaleOpp.eContainer() == null) continue; // already cleaned up from the other side
+                    if (_bxrStaleRef.getEType() == null) continue;
+                    String _bxrStaleTgtName = _bxrStaleRef.getEType().getName();
+                    String _bxrStaleN1 = _bxrStaleEC.getName() + "_" + _bxrStaleRef.getName() + "_inverse_" + _bxrStaleTgtName + "_" + _bxrStaleOpp.getName();
+                    String _bxrStaleN2 = _bxrStaleTgtName + "_" + _bxrStaleOpp.getName() + "_inverse_" + _bxrStaleEC.getName() + "_" + _bxrStaleRef.getName();
+                    if (!_bxrLiveNodeNames.contains(_bxrStaleN1) && !_bxrLiveNodeNames.contains(_bxrStaleN2)) {
+                        EcoreUtil.remove(_bxrStaleOpp);
+                        EcoreUtil.remove(_bxrStaleRef);
+                    }
+                }
+            }
+        }
         // BIDIRECTIONAL_CROSS_REF backward: create paired EReferences with eOpposite
         for (EObject _bxrNode : allSourceObjects(targetModel)) {
             if (!(_hasAnnotation(_bxrNode, "bidirectional") && _hasAnnotation(_bxrNode, "cross"))) continue;
@@ -3227,6 +3405,28 @@ _maSqlTypeMap.put("java.lang.Boolean", "boolean");
             _bxrFwdRef.setEOpposite(_bxrBwdRef);
             _bxrBwdRef.setEOpposite(_bxrFwdRef);
         }
+        // CONTAINMENT_SINGLE backward incremental: remove stale containment EReferences no longer backed by TLM
+        {
+            java.util.Set<String> _csLiveSlotNames = new java.util.HashSet<>();
+            for (EObject _ls : allSourceObjects(targetModel)) {
+                if (_hasAnnotation(_ls, "containment") && _hasAnnotation(_ls, "unidirectional")) {
+                    String _lsn = _tlmGetStr(_ls, _bwTLM_SNAME_F);
+                    if (_lsn != null) _csLiveSlotNames.add(_lsn);
+                }
+            }
+            for (EObject _csStaleObj : allSourceObjects(sourceModel)) {
+                if (!(_csStaleObj instanceof EClass _csStaleEC)) continue;
+                for (org.eclipse.emf.ecore.EStructuralFeature _csStaleF : new java.util.ArrayList<>(_csStaleEC.getEStructuralFeatures())) {
+                    if (!(_csStaleF instanceof EReference _csStaleRef)) continue;
+                    if (!_csStaleRef.isContainment()) continue;
+                    if (_csStaleRef.getEOpposite() != null) continue; // handled by CONTAINMENT_MULTI_BIDIRECTIONAL
+                    String _csExpSlot = _csStaleRef.getName() + "_inverse";
+                    if (!_csLiveSlotNames.contains(_csExpSlot)) {
+                        EcoreUtil.remove(_csStaleRef);
+                    }
+                }
+            }
+        }
         // CONTAINMENT_SINGLE backward: slot with "containment"+"unidirectional" → EReference (containment) in parent EClass
         for (EObject _csBwSlot : allSourceObjects(targetModel)) {
             if (!(_hasAnnotation(_csBwSlot, "containment") && _hasAnnotation(_csBwSlot, "unidirectional"))) continue;
@@ -3251,6 +3451,32 @@ _maSqlTypeMap.put("java.lang.Boolean", "boolean");
             _csRef.setContainment(true);
             _csRef.setUpperBound(_hasAnnotation(_csBwSlot, "single") ? 1 : -1);
             _csParentEClass.getEStructuralFeatures().add(_csRef);
+        }
+        // CONTAINMENT_MULTI_BIDIRECTIONAL backward incremental: remove stale containment EReference pairs
+        {
+            java.util.Set<String> _cmbLiveSlotNames = new java.util.HashSet<>();
+            for (EObject _ls : allSourceObjects(targetModel)) {
+                if (_hasAnnotation(_ls, "containment") && _hasAnnotation(_ls, "bidirectional")) {
+                    String _lsn = _tlmGetStr(_ls, _bwTLM_SNAME_F);
+                    if (_lsn != null) _cmbLiveSlotNames.add(_lsn);
+                }
+            }
+            for (EObject _cmbStaleObj : allSourceObjects(sourceModel)) {
+                if (!(_cmbStaleObj instanceof EClass _cmbStaleEC)) continue;
+                for (org.eclipse.emf.ecore.EStructuralFeature _cmbStaleF : new java.util.ArrayList<>(_cmbStaleEC.getEStructuralFeatures())) {
+                    if (!(_cmbStaleF instanceof EReference _cmbStaleRef)) continue;
+                    if (!_cmbStaleRef.isContainment()) continue;
+                    EReference _cmbStaleOpp = _cmbStaleRef.getEOpposite();
+                    if (_cmbStaleOpp == null) continue;
+                    if (_cmbStaleOpp.eContainer() == null) continue; // already cleaned up
+                    // Expected slot: {bwdRefName}_inverse_{fwdRefName}
+                    String _cmbExpSlot = _cmbStaleOpp.getName() + "_inverse_" + _cmbStaleRef.getName();
+                    if (!_cmbLiveSlotNames.contains(_cmbExpSlot)) {
+                        EcoreUtil.remove(_cmbStaleOpp);
+                        EcoreUtil.remove(_cmbStaleRef);
+                    }
+                }
+            }
         }
         // CONTAINMENT_MULTI_BIDIRECTIONAL backward: slot with "containment"+"bidirectional" → EReference pair
         for (EObject _cmbBwSlot : allSourceObjects(targetModel)) {
