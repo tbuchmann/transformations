@@ -1734,6 +1734,16 @@ public class Ecore2SqlTransformation {
                     && (_hasAnnotation(_ctmBwTyped, "class") && _hasAnnotation(_ctmBwTyped, "concrete"))
             ) {
                 if (isSyntheticObject(_ctmBwTgt)) continue;
+                // Option-A type-mismatch fix: if CE entry exists but stored source has wrong type,
+                // remove stale source and CE entry so the new-object branch creates the correct type.
+                if (corrIndex.inverse().containsKey(_ctmBwTgt)) {
+                    EObject _ctmBwExisting = corrIndex.inverse().get(_ctmBwTgt);
+                    if (!(_ctmBwExisting instanceof EClass)) {
+                        EcoreUtil.remove(_ctmBwExisting);
+                        CorrespondenceModel.removeEntry(corrResource, _ctmBwExisting);
+                        corrIndex.inverse().remove(_ctmBwTgt);
+                    }
+                }
                 if (!corrIndex.inverse().containsKey(_ctmBwTgt)) {
                     // New CTM target object: reconstruct source
                     EObject _ctmBwSrcContainer;
@@ -1837,6 +1847,16 @@ public class Ecore2SqlTransformation {
                     && (_hasAnnotation(_ctmBwTyped, "class") && _hasAnnotation(_ctmBwTyped, "abstract"))
             ) {
                 if (isSyntheticObject(_ctmBwTgt)) continue;
+                // Option-A type-mismatch fix: if CE entry exists but stored source has wrong type,
+                // remove stale source and CE entry so the new-object branch creates the correct type.
+                if (corrIndex.inverse().containsKey(_ctmBwTgt)) {
+                    EObject _ctmBwExisting = corrIndex.inverse().get(_ctmBwTgt);
+                    if (!(_ctmBwExisting instanceof EClass)) {
+                        EcoreUtil.remove(_ctmBwExisting);
+                        CorrespondenceModel.removeEntry(corrResource, _ctmBwExisting);
+                        corrIndex.inverse().remove(_ctmBwTgt);
+                    }
+                }
                 if (!corrIndex.inverse().containsKey(_ctmBwTgt)) {
                     // New CTM target object: reconstruct source
                     EObject _ctmBwSrcContainer;
@@ -1940,6 +1960,16 @@ public class Ecore2SqlTransformation {
                     && (_hasAnnotation(_ctmBwTyped, "attribute") && _hasAnnotation(_ctmBwTyped, "single"))
             ) {
                 if (isSyntheticObject(_ctmBwTgt)) continue;
+                // Option-A type-mismatch fix: if CE entry exists but stored source has wrong type,
+                // remove stale source and CE entry so the new-object branch creates the correct type.
+                if (corrIndex.inverse().containsKey(_ctmBwTgt)) {
+                    EObject _ctmBwExisting = corrIndex.inverse().get(_ctmBwTgt);
+                    if (!(_ctmBwExisting instanceof EAttribute)) {
+                        EcoreUtil.remove(_ctmBwExisting);
+                        CorrespondenceModel.removeEntry(corrResource, _ctmBwExisting);
+                        corrIndex.inverse().remove(_ctmBwTgt);
+                    }
+                }
                 if (!corrIndex.inverse().containsKey(_ctmBwTgt)) {
                     // New CTM target object: reconstruct source
                     EObject _ctmBwSrcContainer;
@@ -2043,6 +2073,16 @@ public class Ecore2SqlTransformation {
                     && (_hasAnnotation(_ctmBwTyped, "attribute") && _hasAnnotation(_ctmBwTyped, "multi"))
             ) {
                 if (isSyntheticObject(_ctmBwTgt)) continue;
+                // Option-A type-mismatch fix: if CE entry exists but stored source has wrong type,
+                // remove stale source and CE entry so the new-object branch creates the correct type.
+                if (corrIndex.inverse().containsKey(_ctmBwTgt)) {
+                    EObject _ctmBwExisting = corrIndex.inverse().get(_ctmBwTgt);
+                    if (!(_ctmBwExisting instanceof EAttribute)) {
+                        EcoreUtil.remove(_ctmBwExisting);
+                        CorrespondenceModel.removeEntry(corrResource, _ctmBwExisting);
+                        corrIndex.inverse().remove(_ctmBwTgt);
+                    }
+                }
                 if (!corrIndex.inverse().containsKey(_ctmBwTgt)) {
                     // New CTM target object: reconstruct source
                     EObject _ctmBwSrcContainer;
@@ -2158,6 +2198,16 @@ public class Ecore2SqlTransformation {
                     && (_hasAnnotation(_ctmBwTyped, "cross") && _hasAnnotation(_ctmBwTyped, "single"))
             ) {
                 if (isSyntheticObject(_ctmBwTgt)) continue;
+                // Option-A type-mismatch fix: if CE entry exists but stored source has wrong type,
+                // remove stale source and CE entry so the new-object branch creates the correct type.
+                if (corrIndex.inverse().containsKey(_ctmBwTgt)) {
+                    EObject _ctmBwExisting = corrIndex.inverse().get(_ctmBwTgt);
+                    if (!(_ctmBwExisting instanceof EReference)) {
+                        EcoreUtil.remove(_ctmBwExisting);
+                        CorrespondenceModel.removeEntry(corrResource, _ctmBwExisting);
+                        corrIndex.inverse().remove(_ctmBwTgt);
+                    }
+                }
                 if (!corrIndex.inverse().containsKey(_ctmBwTgt)) {
                     // New CTM target object: reconstruct source
                     EObject _ctmBwSrcContainer;
@@ -3427,32 +3477,9 @@ _maSqlTypeMap.put("java.lang.Boolean", "boolean");
                 }
             }
         }
-        // CONTAINMENT_SINGLE backward: slot with "containment"+"unidirectional" → EReference (containment) in parent EClass
-        for (EObject _csBwSlot : allSourceObjects(targetModel)) {
-            if (!(_hasAnnotation(_csBwSlot, "containment") && _hasAnnotation(_csBwSlot, "unidirectional"))) continue;
-            EObject _csOwnerNode = _csBwSlot.eContainer();
-            EObject _csFk = _tlmList(_csOwnerNode, _bwTLM_LINKS_F).stream()
-                .filter(lk -> _tlmGetRef(lk, _bwTLM_SRC_F) == _csBwSlot && _hasAnnotation(lk, "containment") && _hasAnnotation(lk, "unidirectional"))
-                .findFirst().orElse(null);
-            if (_csFk == null) continue;
-            EObject _csParentEO = corrIndex.inverse().get(_tlmGetRef(_csFk, _bwTLM_TGT_F));
-            if (!(_csParentEO instanceof EClass _csParentEClass)) continue;
-            EObject _csChildEO = corrIndex.inverse().get(_csOwnerNode);
-            if (!(_csChildEO instanceof EClass _csChildEClass)) continue;
-            String _csSlotName = _tlmGetStr(_csBwSlot, _bwTLM_SNAME_F);
-            String _csRefName = _csSlotName != null && _csSlotName.endsWith("_inverse")
-                ? _csSlotName.substring(0, _csSlotName.length() - "_inverse".length())
-                : _csSlotName;
-            final String _csRefNameF = _csRefName;
-            if (_csParentEClass.getEStructuralFeatures().stream().anyMatch(f -> _csRefNameF.equals(f.getName()))) continue;
-            EReference _csRef = EcoreFactory.eINSTANCE.createEReference();
-            _csRef.setName(_csRefName);
-            _csRef.setEType(_csChildEClass);
-            _csRef.setContainment(true);
-            _csRef.setUpperBound(_hasAnnotation(_csBwSlot, "single") ? 1 : -1);
-            _csParentEClass.getEStructuralFeatures().add(_csRef);
-        }
         // CONTAINMENT_MULTI_BIDIRECTIONAL backward incremental: remove stale containment EReference pairs
+        // (must run before CONTAINMENT_SINGLE creation so that a bidirectional ref that changed to
+        // unidirectional is removed before the CS creation guard checks for an existing ref by name)
         {
             java.util.Set<String> _cmbLiveSlotNames = new java.util.HashSet<>();
             for (EObject _ls : allSourceObjects(targetModel)) {
@@ -3477,6 +3504,31 @@ _maSqlTypeMap.put("java.lang.Boolean", "boolean");
                     }
                 }
             }
+        }
+        // CONTAINMENT_SINGLE backward: slot with "containment"+"unidirectional" → EReference (containment) in parent EClass
+        for (EObject _csBwSlot : allSourceObjects(targetModel)) {
+            if (!(_hasAnnotation(_csBwSlot, "containment") && _hasAnnotation(_csBwSlot, "unidirectional"))) continue;
+            EObject _csOwnerNode = _csBwSlot.eContainer();
+            EObject _csFk = _tlmList(_csOwnerNode, _bwTLM_LINKS_F).stream()
+                .filter(lk -> _tlmGetRef(lk, _bwTLM_SRC_F) == _csBwSlot && _hasAnnotation(lk, "containment") && _hasAnnotation(lk, "unidirectional"))
+                .findFirst().orElse(null);
+            if (_csFk == null) continue;
+            EObject _csParentEO = corrIndex.inverse().get(_tlmGetRef(_csFk, _bwTLM_TGT_F));
+            if (!(_csParentEO instanceof EClass _csParentEClass)) continue;
+            EObject _csChildEO = corrIndex.inverse().get(_csOwnerNode);
+            if (!(_csChildEO instanceof EClass _csChildEClass)) continue;
+            String _csSlotName = _tlmGetStr(_csBwSlot, _bwTLM_SNAME_F);
+            String _csRefName = _csSlotName != null && _csSlotName.endsWith("_inverse")
+                ? _csSlotName.substring(0, _csSlotName.length() - "_inverse".length())
+                : _csSlotName;
+            final String _csRefNameF = _csRefName;
+            if (_csParentEClass.getEStructuralFeatures().stream().anyMatch(f -> _csRefNameF.equals(f.getName()))) continue;
+            EReference _csRef = EcoreFactory.eINSTANCE.createEReference();
+            _csRef.setName(_csRefName);
+            _csRef.setEType(_csChildEClass);
+            _csRef.setContainment(true);
+            _csRef.setUpperBound(_hasAnnotation(_csBwSlot, "single") ? 1 : -1);
+            _csParentEClass.getEStructuralFeatures().add(_csRef);
         }
         // CONTAINMENT_MULTI_BIDIRECTIONAL backward: slot with "containment"+"bidirectional" → EReference pair
         for (EObject _cmbBwSlot : allSourceObjects(targetModel)) {
