@@ -79,6 +79,10 @@ public class Pdb12Pdb2Transformation {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // Annotation Helpers (generated only when target metamodel supports annotations)
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ════════════════════════════════════════════════════════════════════════
     // Public Entry Points — Forward
     // ════════════════════════════════════════════════════════════════════════
 
@@ -335,10 +339,12 @@ public class Pdb12Pdb2Transformation {
             objectMap.put(source, target);
         }
 
+
         // Phase 1: Traverse containment hierarchy and create contained objects
         for (EObject sourceRoot : sourceRoots) {
             createAndMapObjects(sourceRoot, objectMap, visited, options);
         }
+
 
         // Phase 2: Resolve all cross-references
         resolveReferences(objectMap);
@@ -382,6 +388,27 @@ public class Pdb12Pdb2Transformation {
         List<EObject> _created = new ArrayList<>();
         List<EObject> _updated = new ArrayList<>();
 
+        // Bootstrap: ensure root element pairs are in the corr model before Phase 1.
+        // Without this, root elements (eContainer == null) would be treated as new objects
+        // on the first incremental call and a duplicate root would be added to the target resource.
+        {
+            List<EObject> _sRoots = sourceModel.getContents();
+            List<EObject> _tRoots = existingTarget.getContents();
+            for (int _ri = 0; _ri < Math.min(_sRoots.size(), _tRoots.size()); _ri++) {
+                EObject _sRoot = _sRoots.get(_ri);
+                EObject _tRoot = _tRoots.get(_ri);
+                if (CorrespondenceModel.findBySource(corrResource, _sRoot).isEmpty()) {
+                    updateTargetAttributes(_sRoot, _tRoot, options);
+                    String _rfp  = computeFingerprint(_sRoot);
+                    String _rbfp = computeFingerprintBack(_tRoot);
+                    CorrespondenceModel.addEntry(corrResource,
+                            _sRoot, _sRoot.eClass().getName(), _rfp,
+                            _tRoot, _tRoot.eClass().getName(), _rbfp, "", "");
+                    corrIndex.put(_sRoot, _tRoot);
+                }
+            }
+        }
+
         // Phase 1: Regular typed objects (TypeMappings only).
         // Role-based source types (e.g. FamilyMember) are handled exclusively in Phase 1b
         // to avoid consuming their change signal before mapRoleBasedTypesIncremental runs.
@@ -405,6 +432,34 @@ public class Pdb12Pdb2Transformation {
                 }
             } else {
                 // Known: check containment role and fingerprint for changes
+                EObject targetObj = corrIndex.get(srcObj);
+                // Re-attach to target resource if detached (e.g. target was reset but corr model persists).
+                // Prefer the stored target containment role so cross-named containment features
+                // (e.g. source "eClassifiers" → target "ownedTables") are matched correctly.
+                if (targetObj != null && targetObj.eResource() == null) {
+                    String _storedTgtRole = CorrespondenceModel.getTargetContainmentRole(existingEntry.get());
+                    if (_storedTgtRole != null && !_storedTgtRole.isEmpty()) {
+                        EObject _srcParent = srcObj.eContainer();
+                        EObject _tgtParent = _srcParent != null ? corrIndex.get(_srcParent) : null;
+                        if (_tgtParent != null) {
+                            org.eclipse.emf.ecore.EStructuralFeature _raFeat =
+                                _tgtParent.eClass().getEStructuralFeature(_storedTgtRole);
+                            if (_raFeat != null && targetObj.eContainer() == null) {
+                                if (_raFeat.isMany()) {
+                                    @SuppressWarnings("unchecked")
+                                    EList<EObject> _raList = (EList<EObject>) _tgtParent.eGet(_raFeat);
+                                    _raList.add(targetObj);
+                                } else {
+                                    _tgtParent.eSet(_raFeat, targetObj);
+                                }
+                            }
+                        } else {
+                            existingTarget.getContents().add(targetObj);
+                        }
+                    } else {
+                        addToTargetContainment(srcObj, targetObj, existingTarget, corrIndex);
+                    }
+                }
                 String _currentSrcRole = srcObj.eContainmentFeature() != null ? srcObj.eContainmentFeature().getName() : "";
                 String _storedSrcRole  = CorrespondenceModel.getSourceContainmentRole(existingEntry.get());
                 if (_storedSrcRole == null) _storedSrcRole = "";
@@ -415,10 +470,11 @@ public class Pdb12Pdb2Transformation {
                 }
                 String storedFp = CorrespondenceModel.getFingerprint(existingEntry.get());
                 if (!currentFp.equals(storedFp)) {
-                    EObject targetObj = corrIndex.get(srcObj);
                     if (targetObj != null) {
                         updateTargetAttributes(srcObj, targetObj, options);
                         CorrespondenceModel.updateFingerprint(existingEntry.get(), currentFp);
+                        // Also update target fingerprint so backward direction sees a consistent baseline.
+                        CorrespondenceModel.updateTargetFingerprint(existingEntry.get(), computeFingerprintBack(targetObj));
                         _updated.add(targetObj);
                     }
                 }
@@ -492,6 +548,7 @@ public class Pdb12Pdb2Transformation {
             createAndMapObjectsBack(targetRoot, objectMap, visited, options);
         }
 
+
         // Phase 2: Resolve all cross-references
         resolveReferencesBack(objectMap);
 
@@ -516,6 +573,25 @@ public class Pdb12Pdb2Transformation {
         com.google.common.collect.BiMap<EObject, EObject> corrIndex = ctx.getCorrIndex();
         List<EObject> _createdBack = new ArrayList<>();
         List<EObject> _updatedBack = new ArrayList<>();
+
+        // Bootstrap: ensure root element pairs are in the corr model before Phase 1.
+        {
+            List<EObject> _tRoots = targetModel.getContents();
+            List<EObject> _sRoots = sourceModel.getContents();
+            for (int _ri = 0; _ri < Math.min(_tRoots.size(), _sRoots.size()); _ri++) {
+                EObject _tRoot = _tRoots.get(_ri);
+                EObject _sRoot = _sRoots.get(_ri);
+                if (!corrIndex.inverse().containsKey(_tRoot)) {
+                    updateSourceAttributes(_tRoot, _sRoot, options);
+                    String _rfp  = computeFingerprint(_sRoot);
+                    String _rbfp = computeFingerprintBack(_tRoot);
+                    CorrespondenceModel.addEntry(corrResource,
+                            _sRoot, _sRoot.eClass().getName(), _rfp,
+                            _tRoot, _tRoot.eClass().getName(), _rbfp, "", "");
+                    corrIndex.put(_sRoot, _tRoot);
+                }
+            }
+        }
 
         // Phase 1: All typed objects — TypeMappings AND role-based target types.
         // For TypeMapping objects: update attributes + fingerprint here.
@@ -546,6 +622,33 @@ public class Pdb12Pdb2Transformation {
                 EObject srcObj = corrIndex.inverse().get(tgtObj);
                 if (srcObj != null) {
                     Optional<EObject> entryOpt = CorrespondenceModel.findBySource(corrResource, srcObj);
+                    // Re-attach source to source resource if detached (e.g. source was reset but corr model persists).
+                    // Prefer the stored source containment role so cross-named containment features
+                    // (e.g. target "ownedTables" → source "eClassifiers") are matched correctly.
+                    if (srcObj.eResource() == null) {
+                        String _storedSrcRole = entryOpt.map(CorrespondenceModel::getSourceContainmentRole).orElse("");
+                        if (_storedSrcRole != null && !_storedSrcRole.isEmpty()) {
+                            EObject _tgtParent = tgtObj.eContainer();
+                            EObject _srcParent = _tgtParent != null ? corrIndex.inverse().get(_tgtParent) : null;
+                            if (_srcParent != null) {
+                                org.eclipse.emf.ecore.EStructuralFeature _raFeat =
+                                    _srcParent.eClass().getEStructuralFeature(_storedSrcRole);
+                                if (_raFeat != null && srcObj.eContainer() == null) {
+                                    if (_raFeat.isMany()) {
+                                        @SuppressWarnings("unchecked")
+                                        EList<EObject> _raList = (EList<EObject>) _srcParent.eGet(_raFeat);
+                                        _raList.add(srcObj);
+                                    } else {
+                                        _srcParent.eSet(_raFeat, srcObj);
+                                    }
+                                }
+                            } else {
+                                sourceModel.getContents().add(srcObj);
+                            }
+                        } else {
+                            addToSourceContainment(tgtObj, srcObj, sourceModel, corrIndex);
+                        }
+                    }
                     if (entryOpt.isPresent()) {
                         String _currentTgtRole = tgtObj.eContainmentFeature() != null ? tgtObj.eContainmentFeature().getName() : "";
                         String _storedTgtRole  = CorrespondenceModel.getTargetContainmentRole(entryOpt.get());
@@ -564,6 +667,8 @@ public class Pdb12Pdb2Transformation {
                             // Role-based types: Phase 1b commits the fingerprint after structural updates.
                             if (isCoveredByTypeMappingTarget(tgtObj)) {
                                 CorrespondenceModel.updateTargetFingerprint(entryOpt.get(), currentFp);
+                                // Also update source fingerprint so forward direction sees a consistent baseline.
+                                CorrespondenceModel.updateFingerprint(entryOpt.get(), computeFingerprint(srcObj));
                                 _updatedBack.add(srcObj);
                             }
                         }
@@ -684,6 +789,7 @@ public class Pdb12Pdb2Transformation {
         return target;
     }
 
+
     // ════════════════════════════════════════════════════════════════════════
     // Phase 2: Cross-Reference Resolution (Forward)
     // ════════════════════════════════════════════════════════════════════════
@@ -725,12 +831,12 @@ public class Pdb12Pdb2Transformation {
             source = null;
 
             // Handle Database → Database
-            if (target instanceof pdb2.Database) {
-                source = transformBackDatabase((pdb2.Database) target, options);
-            } else
+            if (target instanceof pdb2.Database _typed) {
+                source = transformBackDatabaseAsDatabase(_typed, options);
+            }
             // Handle Person → Person
-            if (target instanceof pdb2.Person) {
-                source = transformBackPerson((pdb2.Person) target, options);
+            else if (target instanceof pdb2.Person _typed) {
+                source = transformBackPersonAsPerson(_typed, options);
             }
 
             if (source != null) {
@@ -816,6 +922,11 @@ public class Pdb12Pdb2Transformation {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // Phase 1c: Edge Materialization Methods
+    // ════════════════════════════════════════════════════════════════════════
+
+
+    // ════════════════════════════════════════════════════════════════════════
     // Helper Methods for Type-Specific Transformations
     // ════════════════════════════════════════════════════════════════════════
 
@@ -836,7 +947,7 @@ public class Pdb12Pdb2Transformation {
     /**
      * Transforms Database → Database (backward)
      */
-    private static pdb1.Database transformBackDatabase(pdb2.Database target, Options options) {
+    private static pdb1.Database transformBackDatabaseAsDatabase(pdb2.Database target, Options options) {
         if (target == null) {
             return null;
         }
@@ -857,31 +968,29 @@ public class Pdb12Pdb2Transformation {
 
         pdb2.Person target = Pdb2Factory.eINSTANCE.createPerson();
 
+        target.setName(source.getFirstName() + " " + source.getLastName());
+        target.setName(source.getFirstName() + " " + source.getLastName());
         target.setBirthday(source.getBirthday());
         target.setPlaceOfBirth(source.getPlaceOfBirth());
         target.setId(source.getId());
-        target.setIncrementalID(source.getIncrementalID());
-        target.setName(source.getFirstName() + " " + source.getLastName());
-        target.setName(source.getFirstName() + " " + source.getLastName());
         return target;
     }
 
     /**
      * Transforms Person → Person (backward)
      */
-    private static pdb1.Person transformBackPerson(pdb2.Person target, Options options) {
+    private static pdb1.Person transformBackPersonAsPerson(pdb2.Person target, Options options) {
         if (target == null) {
             return null;
         }
 
         pdb1.Person source = Pdb1Factory.eINSTANCE.createPerson();
 
+        source.setFirstName(target.getName().contains(" ") ? target.getName().substring(0, "last".equals(options.nameBackwardSplitStrategy()) ? target.getName().lastIndexOf(' ') : target.getName().indexOf(' ')) : target.getName());
+        source.setLastName(target.getName().contains(" ") ? target.getName().substring(("last".equals(options.nameBackwardSplitStrategy()) ? target.getName().lastIndexOf(' ') : target.getName().indexOf(' ')) + 1) : "");
         source.setBirthday(target.getBirthday());
         source.setPlaceOfBirth(target.getPlaceOfBirth());
         source.setId(target.getId());
-        source.setIncrementalID(target.getIncrementalID());
-        source.setFirstName(target.getName().contains(" ") ? target.getName().substring(0, "last".equals(options.nameBackwardSplitStrategy()) ? target.getName().lastIndexOf(' ') : target.getName().indexOf(' ')) : target.getName());
-        source.setLastName(target.getName().contains(" ") ? target.getName().substring(("last".equals(options.nameBackwardSplitStrategy()) ? target.getName().lastIndexOf(' ') : target.getName().indexOf(' ')) + 1) : "");
         return source;
     }
 
@@ -897,16 +1006,31 @@ public class Pdb12Pdb2Transformation {
     private static String computeFingerprint(EObject obj) {
         StringBuilder sb = new StringBuilder();
         sb.append(obj.eClass().getName()).append(":");
+        if (obj.eContainer() != null) {
+            EStructuralFeature _cfContainerNameFeat = obj.eContainer().eClass().getEStructuralFeature("name");
+            if (_cfContainerNameFeat != null) { sb.append("@").append(obj.eContainer().eGet(_cfContainerNameFeat)).append(":"); }
+        }
         if (obj instanceof pdb1.Database typed) {
             sb.append(typed.getName()).append("|");
+            // Non-key attributes for change detection
+            for (EAttribute ea : obj.eClass().getEAllAttributes()) {
+                if ("name".equals(ea.getName()) || "incrementalID".equals(ea.getName())) continue;
+                sb.append(obj.eGet(ea)).append("|");
+            }
             return sb.toString();
         }
         if (obj instanceof pdb1.Person typed) {
             sb.append(typed.getId()).append("|");
+            // Non-key attributes for change detection
+            for (EAttribute ea : obj.eClass().getEAllAttributes()) {
+                if ("id".equals(ea.getName()) || "incrementalID".equals(ea.getName())) continue;
+                sb.append(obj.eGet(ea)).append("|");
+            }
             return sb.toString();
         }
         // Generic fallback: all attributes reflectively
         for (EAttribute ea : obj.eClass().getEAllAttributes()) {
+            if ("incrementalID".equals(ea.getName())) continue;
             sb.append(obj.eGet(ea)).append("|");
         }
         return sb.toString();
@@ -969,6 +1093,7 @@ public class Pdb12Pdb2Transformation {
         return false;
     }
 
+
     /** Updates the target object's attributes to reflect changes in the source object. */
     private static void updateTargetAttributes(EObject srcObj, EObject tgtObj, Options options) {
         if (srcObj instanceof pdb1.Database source
@@ -977,12 +1102,11 @@ public class Pdb12Pdb2Transformation {
         }
         if (srcObj instanceof pdb1.Person source
                 && tgtObj instanceof pdb2.Person target) {
+            target.setName(source.getFirstName() + " " + source.getLastName());
+            target.setName(source.getFirstName() + " " + source.getLastName());
             target.setBirthday(source.getBirthday());
             target.setPlaceOfBirth(source.getPlaceOfBirth());
             target.setId(source.getId());
-            target.setIncrementalID(source.getIncrementalID());
-            target.setName(source.getFirstName() + " " + source.getLastName());
-            target.setName(source.getFirstName() + " " + source.getLastName());
         }
     }
 
@@ -1016,6 +1140,22 @@ public class Pdb12Pdb2Transformation {
                 }
             }
         }
+        // Reflective fallback: if no explicit mapping matched, use the source containment
+        // feature name to locate the corresponding containment feature on the target parent.
+        // Handles cases where the LLM omits the containment referenceMapping (e.g. same-named features).
+        if (newTarget.eContainer() == null && srcObj.eContainmentFeature() != null) {
+            org.eclipse.emf.ecore.EStructuralFeature _tgtFeat =
+                    targetParent.eClass().getEStructuralFeature(srcObj.eContainmentFeature().getName());
+            if (_tgtFeat instanceof org.eclipse.emf.ecore.EReference _tgtRef && _tgtRef.isContainment()) {
+                if (_tgtRef.isMany()) {
+                    @SuppressWarnings("unchecked")
+                    EList<EObject> _tgtList = (EList<EObject>) targetParent.eGet(_tgtRef);
+                    _tgtList.add(newTarget);
+                } else {
+                    targetParent.eSet(_tgtRef, newTarget);
+                }
+            }
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1031,14 +1171,25 @@ public class Pdb12Pdb2Transformation {
         sb.append(obj.eClass().getName()).append(":");
         if (obj instanceof pdb2.Database typed) {
             sb.append(typed.getName()).append("|");
+            // Non-key attributes for change detection
+            for (EAttribute ea : obj.eClass().getEAllAttributes()) {
+                if ("name".equals(ea.getName()) || "incrementalID".equals(ea.getName())) continue;
+                sb.append(obj.eGet(ea)).append("|");
+            }
             return sb.toString();
         }
         if (obj instanceof pdb2.Person typed) {
             sb.append(typed.getId()).append("|");
+            // Non-key attributes for change detection
+            for (EAttribute ea : obj.eClass().getEAllAttributes()) {
+                if ("id".equals(ea.getName()) || "incrementalID".equals(ea.getName())) continue;
+                sb.append(obj.eGet(ea)).append("|");
+            }
             return sb.toString();
         }
         // Generic fallback: all attributes reflectively
         for (EAttribute ea : obj.eClass().getEAllAttributes()) {
+            if ("incrementalID".equals(ea.getName())) continue;
             sb.append(obj.eGet(ea)).append("|");
         }
         return sb.toString();
@@ -1071,10 +1222,10 @@ public class Pdb12Pdb2Transformation {
     /** Creates a new source object for the given target EObject, or null if no mapping exists. */
     private static EObject createNewSourceObject(EObject tgtObj, Options options) {
         if (tgtObj instanceof pdb2.Database tgt) {
-            return transformBackDatabase(tgt, options);
+            return transformBackDatabaseAsDatabase(tgt, options);
         }
         if (tgtObj instanceof pdb2.Person tgt) {
-            return transformBackPerson(tgt, options);
+            return transformBackPersonAsPerson(tgt, options);
         }
         return null;
     }
@@ -1093,12 +1244,11 @@ public class Pdb12Pdb2Transformation {
         }
         if (tgtObj instanceof pdb2.Person target
                 && srcObj instanceof pdb1.Person source) {
+            source.setFirstName(target.getName().contains(" ") ? target.getName().substring(0, "last".equals(options.nameBackwardSplitStrategy()) ? target.getName().lastIndexOf(' ') : target.getName().indexOf(' ')) : target.getName());
+            source.setLastName(target.getName().contains(" ") ? target.getName().substring(("last".equals(options.nameBackwardSplitStrategy()) ? target.getName().lastIndexOf(' ') : target.getName().indexOf(' ')) + 1) : "");
             source.setBirthday(target.getBirthday());
             source.setPlaceOfBirth(target.getPlaceOfBirth());
             source.setId(target.getId());
-            source.setIncrementalID(target.getIncrementalID());
-            source.setFirstName(target.getName().contains(" ") ? target.getName().substring(0, "last".equals(options.nameBackwardSplitStrategy()) ? target.getName().lastIndexOf(' ') : target.getName().indexOf(' ')) : target.getName());
-            source.setLastName(target.getName().contains(" ") ? target.getName().substring(("last".equals(options.nameBackwardSplitStrategy()) ? target.getName().lastIndexOf(' ') : target.getName().indexOf(' ')) + 1) : "");
         }
     }
 
@@ -1132,6 +1282,21 @@ public class Pdb12Pdb2Transformation {
                 }
             }
         }
+        // Reflective fallback: if no explicit mapping matched, use the target containment
+        // feature name to locate the corresponding containment feature on the source parent.
+        if (newSource.eContainer() == null && tgtObj.eContainmentFeature() != null) {
+            org.eclipse.emf.ecore.EStructuralFeature _srcFeat =
+                    srcParent.eClass().getEStructuralFeature(tgtObj.eContainmentFeature().getName());
+            if (_srcFeat instanceof org.eclipse.emf.ecore.EReference _srcRef && _srcRef.isContainment()) {
+                if (_srcRef.isMany()) {
+                    @SuppressWarnings("unchecked")
+                    EList<EObject> _srcList = (EList<EObject>) srcParent.eGet(_srcRef);
+                    _srcList.add(newSource);
+                } else {
+                    srcParent.eSet(_srcRef, newSource);
+                }
+            }
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1153,7 +1318,7 @@ public class Pdb12Pdb2Transformation {
      */
     @Deprecated
     public static pdb1.Database transformBack(pdb2.Database target) {
-        return transformBackDatabase(target, Options.defaults());
+        return transformBackDatabaseAsDatabase(target, Options.defaults());
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1433,6 +1598,8 @@ public class Pdb12Pdb2Transformation {
         }
 
 
+        // ── Phase 1c: Edge materialization ──────────────────────────────────
+
         // ── Schritt 6: Cross-references ──────────────────────────────────────
         // Rebuild corrIndex after all structural changes.
         corrIndex = CorrespondenceModel.buildIndex(corrModel);
@@ -1446,4 +1613,5 @@ public class Pdb12Pdb2Transformation {
 
         return new SyncResult(_updFwd, _updBwd, _crFwd, _crBwd, _del, _linked, _conflicts);
     }
+
 }
